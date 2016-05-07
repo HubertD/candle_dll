@@ -339,6 +339,11 @@ bool __stdcall DLL candle_dev_open(candle_handle hdev)
 
 }
 
+bool __stdcall DLL candle_dev_get_timestamp_us(candle_handle hdev, uint32_t *timestamp_us)
+{
+	return candle_ctrl_get_timestamp(hdev, timestamp_us);
+}
+
 bool __stdcall DLL candle_dev_close(candle_handle hdev)
 {
     candle_device_t *dev = (candle_device_t*)hdev;
@@ -552,6 +557,11 @@ uint32_t __stdcall DLL candle_frame_id(candle_frame_t *frame)
 bool __stdcall DLL candle_frame_is_extended_id(candle_frame_t *frame)
 {
     return (frame->can_id & 0x80000000) != 0;
+}
+
+bool __stdcall DLL candle_frame_is_rtr(candle_frame_t *frame)
+{
+    return (frame->can_id & 0x40000000) != 0;
 }
 
 uint8_t __stdcall DLL candle_frame_dlc(candle_frame_t *frame)

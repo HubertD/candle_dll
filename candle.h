@@ -80,6 +80,7 @@ typedef enum {
     CANDLE_ERR_SETUPDI_IF_ENUM     = 25,
     CANDLE_ERR_SET_TIMESTAMP_MODE  = 26,
     CANDLE_ERR_DEV_OUT_OF_RANGE    = 27,
+	CANDLE_ERR_GET_TIMESTAMP       = 28,
 } candle_err_t;
 
 #pragma pack(push,1)
@@ -133,6 +134,7 @@ bool __stdcall DLL candle_dev_get(candle_list_handle list, uint8_t dev_num, cand
 bool __stdcall DLL candle_dev_get_state(candle_handle hdev, candle_devstate_t *state);
 wchar_t __stdcall DLL *candle_dev_get_path(candle_handle hdev);
 bool __stdcall DLL candle_dev_open(candle_handle hdev);
+bool __stdcall DLL candle_dev_get_timestamp_us(candle_handle hdev, uint32_t *timestamp_us);
 bool __stdcall DLL candle_dev_close(candle_handle hdev);
 bool __stdcall DLL candle_dev_free(candle_handle hdev);
 
@@ -149,6 +151,7 @@ bool __stdcall DLL candle_frame_read(candle_handle hdev, candle_frame_t *frame, 
 candle_frametype_t __stdcall DLL candle_frame_type(candle_frame_t *frame);
 uint32_t __stdcall DLL candle_frame_id(candle_frame_t *frame);
 bool __stdcall DLL candle_frame_is_extended_id(candle_frame_t *frame);
+bool __stdcall DLL candle_frame_is_rtr(candle_frame_t *frame);
 uint8_t __stdcall DLL candle_frame_dlc(candle_frame_t *frame);
 uint8_t __stdcall DLL *candle_frame_data(candle_frame_t *frame);
 uint32_t __stdcall DLL candle_frame_timestamp_us(candle_frame_t *frame);

@@ -123,6 +123,22 @@ bool candle_ctrl_get_config(candle_device_t *dev, candle_device_config_t *dconf)
     return rc;
 }
 
+bool candle_ctrl_get_timestamp(candle_device_t *dev, uint32_t *current_timestamp)
+{
+    bool rc = usb_control_msg(
+        dev->winUSBHandle,
+        CANDLE_TIMESTAMP_GET,
+        USB_DIR_IN|USB_TYPE_VENDOR|USB_RECIP_INTERFACE,
+        1,
+        dev->interfaceNumber,
+        current_timestamp,
+        sizeof(*current_timestamp)
+    );
+
+    dev->last_error = rc ? CANDLE_ERR_OK : CANDLE_ERR_GET_TIMESTAMP;
+    return rc;
+}
+
 bool candle_ctrl_get_capability(candle_device_t *dev, uint8_t channel, candle_capability_t *data)
 {
     bool rc = usb_control_msg(

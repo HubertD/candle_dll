@@ -6,9 +6,9 @@ CFLAGS = -std=gnu99 -shared
 OUT = candle_api
 
 all:
-	mkdir -p build
+	-mkdir build
 	gcc $(CFLAGS) $(DEFS) $(SRC) $(LIBS) -o build/$(OUT).dll -Wl,--out-implib,build/$(OUT).lib
 
 clean:
-	rm build/$(OUT).dll build/$(OUT).lib build/$(OUT).h
+	-rm build/$(OUT).dll build/$(OUT).lib build/$(OUT).h
 
