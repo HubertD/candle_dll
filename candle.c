@@ -257,6 +257,12 @@ static bool candle_dev_interal_open(candle_handle hdev)
         goto winusb_free;
     }
 
+    ULONG use_raw_io = 1;
+    if (!WinUsb_SetPipePolicy(dev->winUSBHandle, dev->bulkInPipe, RAW_IO, sizeof(use_raw_io), &use_raw_io)) {
+        dev->last_error = CANDLE_ERR_SET_PIPE_RAW_IO;
+        goto winusb_free;
+    } 
+
     if (!candle_ctrl_set_host_format(dev)) {
         goto winusb_free;
     }
