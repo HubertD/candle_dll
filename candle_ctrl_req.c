@@ -46,7 +46,14 @@ static bool usb_control_msg(WINUSB_INTERFACE_HANDLE hnd, uint8_t request, uint8_
     packet.Length = size;
 
     unsigned long bytes_sent = 0;
-    return WinUsb_ControlTransfer(hnd, packet, (uint8_t*)data, size, &bytes_sent, 0);
+
+	bool rc = WinUsb_ControlTransfer(hnd, packet, (uint8_t*)data, size, &bytes_sent, 0);
+
+	static DWORD last_error = 0;
+	if (!rc){
+		last_error = GetLastError();
+	}
+	return rc;
 }
 
 bool candle_ctrl_set_host_format(candle_device_t *dev)
@@ -81,6 +88,11 @@ bool candle_ctrl_set_timestamp_mode(candle_device_t *dev, bool enable_timestamps
         NULL,
         0
     );
+
+	static DWORD last_windows_error;
+	if (!rc){
+		last_windows_error = GetLastError();
+	}
 
     dev->last_error = rc ? CANDLE_ERR_OK : CANDLE_ERR_SET_TIMESTAMP_MODE;
     return rc;

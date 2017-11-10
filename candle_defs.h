@@ -81,6 +81,7 @@ typedef struct {
     candle_capability_t bt_const;
     canlde_rx_urb rxurbs[CANDLE_URB_COUNT];
     HANDLE rxevents[CANDLE_URB_COUNT];
+	UCHAR deviceSpeed;
 } candle_device_t;
 
 typedef struct {

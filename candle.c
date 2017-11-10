@@ -135,20 +135,20 @@ bool __stdcall candle_list_scan(candle_list_handle *list)
 
 }
 
-bool __stdcall DLL candle_list_free(candle_list_handle list)
+DLL bool __stdcall candle_list_free(candle_list_handle list)
 {
     free(list);
     return true;
 }
 
-bool __stdcall DLL candle_list_length(candle_list_handle list, uint8_t *len)
+DLL bool __stdcall candle_list_length(candle_list_handle list, uint8_t *len)
 {
     candle_list_t *l = (candle_list_t *)list;
     *len = l->num_devices;
     return true;
 }
 
-bool __stdcall DLL candle_dev_get(candle_list_handle list, uint8_t dev_num, candle_handle *hdev)
+DLL bool __stdcall candle_dev_get(candle_list_handle list, uint8_t dev_num, candle_handle *hdev)
 {
     candle_list_t *l = (candle_list_t *)list;
     if (l==NULL) {
@@ -174,7 +174,7 @@ bool __stdcall DLL candle_dev_get(candle_list_handle list, uint8_t dev_num, cand
 }
 
 
-bool __stdcall DLL candle_dev_get_state(candle_handle hdev, candle_devstate_t *state)
+DLL bool __stdcall candle_dev_get_state(candle_handle hdev, candle_devstate_t *state)
 {
     if (hdev==NULL) {
         return false;
@@ -185,7 +185,7 @@ bool __stdcall DLL candle_dev_get_state(candle_handle hdev, candle_devstate_t *s
     }
 }
 
-wchar_t __stdcall DLL *candle_dev_get_path(candle_handle hdev)
+DLL wchar_t * __stdcall candle_dev_get_path(candle_handle hdev)
 {
     if (hdev==NULL) {
         return NULL;
@@ -222,7 +222,17 @@ static bool candle_dev_interal_open(candle_handle hdev)
         goto close_handle;
     }
 
-    USB_INTERFACE_DESCRIPTOR ifaceDescriptor;
+	{
+		ULONG length = sizeof(dev->deviceSpeed);
+
+		if (!WinUsb_QueryDeviceInformation(dev->winUSBHandle, DEVICE_SPEED, &length, &dev->deviceSpeed))
+		{
+			dev->last_error = CANDLE_ERR_GET_DEVICE_SPEED;
+			goto winusb_free;
+		}
+	}
+
+	USB_INTERFACE_DESCRIPTOR ifaceDescriptor;
     if (!WinUsb_QueryInterfaceSettings(dev->winUSBHandle, 0, &ifaceDescriptor)) {
         dev->last_error = CANDLE_ERR_QUERY_INTERFACE;
         goto winusb_free;
@@ -267,9 +277,11 @@ static bool candle_dev_interal_open(candle_handle hdev)
         goto winusb_free;
     }
 
+#if 0
     if (!candle_ctrl_set_timestamp_mode(dev, true)) {
         goto winusb_free;
-    }
+	}
+#endif
 
     if (!candle_ctrl_get_config(dev, &dev->dconf)) {
         goto winusb_free;
@@ -285,9 +297,11 @@ static bool candle_dev_interal_open(candle_handle hdev)
 
 winusb_free:
     WinUsb_Free(dev->winUSBHandle);
+	dev->winUSBHandle = NULL;  // Null usb handle so we don't free it twice
 
 close_handle:
     CloseHandle(dev->deviceHandle);
+	dev->deviceHandle = NULL; // Null device handle so we don't free it twice
     return false;
 
 }
@@ -323,7 +337,7 @@ static bool candle_close_rxurbs(candle_device_t *dev)
 }
 
 
-bool __stdcall DLL candle_dev_open(candle_handle hdev)
+DLL bool __stdcall candle_dev_open(candle_handle hdev)
 {
     candle_device_t *dev = (candle_device_t*)hdev;
 
@@ -345,39 +359,47 @@ bool __stdcall DLL candle_dev_open(candle_handle hdev)
 
 }
 
-bool __stdcall DLL candle_dev_get_timestamp_us(candle_handle hdev, uint32_t *timestamp_us)
+DLL bool __stdcall candle_dev_get_timestamp_us(candle_handle hdev, uint32_t *timestamp_us)
 {
 	return candle_ctrl_get_timestamp(hdev, timestamp_us);
 }
 
-bool __stdcall DLL candle_dev_close(candle_handle hdev)
+DLL bool __stdcall candle_dev_close(candle_handle hdev)
 {
     candle_device_t *dev = (candle_device_t*)hdev;
 
-    candle_close_rxurbs(dev);
+	if (!dev)
+		return true;
 
-    WinUsb_Free(dev->winUSBHandle);
+    candle_close_rxurbs(dev);
+	
+	// Check handle to see if it is initialized before we free it
+	if (dev->winUSBHandle)
+		WinUsb_Free(dev->winUSBHandle);
     dev->winUSBHandle = NULL;
-    CloseHandle(dev->deviceHandle);
+
+	// Check handle to see if it is initialized before we free it
+	if (dev->deviceHandle)
+		CloseHandle(dev->deviceHandle);
     dev->deviceHandle = NULL;
 
     dev->last_error = CANDLE_ERR_OK;
     return true;
 }
 
-bool __stdcall DLL candle_dev_free(candle_handle hdev)
+DLL bool __stdcall candle_dev_free(candle_handle hdev)
 {
     free(hdev);
     return true;
 }
 
-candle_err_t __stdcall DLL candle_dev_last_error(candle_handle hdev)
+candle_err_t DLL __stdcall candle_dev_last_error(candle_handle hdev)
 {
     candle_device_t *dev = (candle_device_t*)hdev;
     return dev->last_error;
 }
 
-bool __stdcall DLL candle_channel_count(candle_handle hdev, uint8_t *num_channels)
+DLL bool __stdcall candle_channel_count(candle_handle hdev, uint8_t *num_channels)
 {
     // TODO check if info was already read from device; try to do so; throw error...
     candle_device_t *dev = (candle_device_t*)hdev;
@@ -385,7 +407,7 @@ bool __stdcall DLL candle_channel_count(candle_handle hdev, uint8_t *num_channel
     return true;
 }
 
-bool __stdcall DLL candle_channel_get_capabilities(candle_handle hdev, uint8_t ch, candle_capability_t *cap)
+DLL bool __stdcall candle_channel_get_capabilities(candle_handle hdev, uint8_t ch, candle_capability_t *cap)
 {
     // TODO check if info was already read from device; try to do so; throw error...
     candle_device_t *dev = (candle_device_t*)hdev;
@@ -393,14 +415,14 @@ bool __stdcall DLL candle_channel_get_capabilities(candle_handle hdev, uint8_t c
     return true;
 }
 
-bool __stdcall DLL candle_channel_set_timing(candle_handle hdev, uint8_t ch, candle_bittiming_t *data)
+DLL bool __stdcall candle_channel_set_timing(candle_handle hdev, uint8_t ch, candle_bittiming_t *data)
 {
     // TODO ensure device is open, check channel count..
     candle_device_t *dev = (candle_device_t*)hdev;
     return candle_ctrl_set_bittiming(dev, ch, data);
 }
 
-bool __stdcall DLL candle_channel_set_bitrate(candle_handle hdev, uint8_t ch, uint32_t bitrate)
+DLL bool __stdcall candle_channel_set_bitrate(candle_handle hdev, uint8_t ch, uint32_t bitrate)
 {
     // TODO ensure device is open, check channel count..
     candle_device_t *dev = (candle_device_t*)hdev;
@@ -468,21 +490,21 @@ bool __stdcall DLL candle_channel_set_bitrate(candle_handle hdev, uint8_t ch, ui
     return candle_ctrl_set_bittiming(dev, ch, &t);
 }
 
-bool __stdcall DLL candle_channel_start(candle_handle hdev, uint8_t ch, uint32_t flags)
+DLL bool __stdcall candle_channel_start(candle_handle hdev, uint8_t ch, uint32_t flags)
 {
     // TODO ensure device is open, check channel count..
     candle_device_t *dev = (candle_device_t*)hdev;
     return candle_ctrl_set_device_mode(dev, ch, CANDLE_DEVMODE_START, flags);
 }
 
-bool __stdcall DLL candle_channel_stop(candle_handle hdev, uint8_t ch)
+DLL bool __stdcall candle_channel_stop(candle_handle hdev, uint8_t ch)
 {
     // TODO ensure device is open, check channel count..
     candle_device_t *dev = (candle_device_t*)hdev;
     return candle_ctrl_set_device_mode(dev, ch, CANDLE_DEVMODE_RESET, 0);
 }
 
-bool __stdcall DLL candle_frame_send(candle_handle hdev, uint8_t ch, candle_frame_t *frame)
+DLL bool __stdcall candle_frame_send(candle_handle hdev, uint8_t ch, candle_frame_t *frame)
 {
     // TODO ensure device is open, check channel count..
     candle_device_t *dev = (candle_device_t*)hdev;
@@ -506,7 +528,7 @@ bool __stdcall DLL candle_frame_send(candle_handle hdev, uint8_t ch, candle_fram
 
 }
 
-bool __stdcall DLL candle_frame_read(candle_handle hdev, candle_frame_t *frame, uint32_t timeout_ms)
+DLL bool __stdcall candle_frame_read(candle_handle hdev, candle_frame_t *frame, uint32_t timeout_ms)
 {
     // TODO ensure device is open..
     candle_device_t *dev = (candle_device_t*)hdev;
@@ -531,18 +553,21 @@ bool __stdcall DLL candle_frame_read(candle_handle hdev, candle_frame_t *frame, 
         return false;
     }
 
-    if (bytes_transfered != sizeof(*frame)) {
+	// Check bytes transferred for size of frame and size of frame with no timestamp
+	if (bytes_transfered != sizeof(*frame) && bytes_transfered != (sizeof(*frame) - 4)) {
         candle_prepare_read(dev, urb_num);
         dev->last_error = CANDLE_ERR_READ_SIZE;
         return false;
     }
 
-    memcpy(frame, dev->rxurbs[urb_num].buf, sizeof(*frame));
+	memset(frame, 0, sizeof(*frame));
+
+    memcpy(frame, dev->rxurbs[urb_num].buf, bytes_transfered);
 
     return candle_prepare_read(dev, urb_num);
 }
 
-candle_frametype_t __stdcall DLL candle_frame_type(candle_frame_t *frame)
+candle_frametype_t DLL __stdcall candle_frame_type(candle_frame_t *frame)
 {
     if (frame->echo_id != 0xFFFFFFFF) {
         return CANDLE_FRAMETYPE_ECHO;
@@ -555,32 +580,32 @@ candle_frametype_t __stdcall DLL candle_frame_type(candle_frame_t *frame)
     return CANDLE_FRAMETYPE_RECEIVE;
 }
 
-uint32_t __stdcall DLL candle_frame_id(candle_frame_t *frame)
+uint32_t DLL __stdcall candle_frame_id(candle_frame_t *frame)
 {
     return frame->can_id & 0x1FFFFFFF;
 }
 
-bool __stdcall DLL candle_frame_is_extended_id(candle_frame_t *frame)
+DLL bool __stdcall candle_frame_is_extended_id(candle_frame_t *frame)
 {
     return (frame->can_id & 0x80000000) != 0;
 }
 
-bool __stdcall DLL candle_frame_is_rtr(candle_frame_t *frame)
+DLL bool __stdcall candle_frame_is_rtr(candle_frame_t *frame)
 {
     return (frame->can_id & 0x40000000) != 0;
 }
 
-uint8_t __stdcall DLL candle_frame_dlc(candle_frame_t *frame)
+DLL uint8_t __stdcall candle_frame_dlc(candle_frame_t *frame)
 {
     return frame->can_dlc;
 }
 
-uint8_t __stdcall DLL *candle_frame_data(candle_frame_t *frame)
+DLL uint8_t * __stdcall candle_frame_data(candle_frame_t *frame)
 {
     return frame->data;
 }
 
-uint32_t __stdcall DLL candle_frame_timestamp_us(candle_frame_t *frame)
+DLL uint32_t __stdcall candle_frame_timestamp_us(candle_frame_t *frame)
 {
     return frame->timestamp_us;
 }
