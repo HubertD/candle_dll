@@ -44,46 +44,46 @@ typedef enum {
 } candle_frametype_t;
 
 typedef enum {
-    CANDLE_MODE_NORMAL        = 0x00,
-    CANDLE_MODE_LISTEN_ONLY   = 0x01,
-    CANDLE_MODE_LOOP_BACK     = 0x02,
-    CANDLE_MODE_TRIPLE_SAMPLE = 0x04,
-    CANDLE_MODE_ONE_SHOT      = 0x08,
-	CANDLE_MODE_HW_TIMESTAMP  = 0x10
+	CANDLE_MODE_NORMAL                            = 0x00,
+    CANDLE_MODE_LISTEN_ONLY                       = 0x01,
+    CANDLE_MODE_LOOP_BACK                         = 0x02,
+    CANDLE_MODE_TRIPLE_SAMPLE                     = 0x04,
+    CANDLE_MODE_ONE_SHOT                          = 0x08,
+	CANDLE_MODE_HW_TIMESTAMP                      = 0x10,
+	CANDLE_MODE_PAD_PACKETS_TO_MAX_PACKET_SIZE    = 0x80
 } candle_mode_t;
 
 typedef enum {
-    CANDLE_ERR_OK                  =  0,
-    CANDLE_ERR_CREATE_FILE         =  1,
-    CANDLE_ERR_WINUSB_INITIALIZE   =  2,
-    CANDLE_ERR_QUERY_INTERFACE     =  3,
-    CANDLE_ERR_QUERY_PIPE          =  4,
-    CANDLE_ERR_PARSE_IF_DESCR      =  5,
-    CANDLE_ERR_SET_HOST_FORMAT     =  6,
-    CANDLE_ERR_GET_DEVICE_INFO     =  7,
-    CANDLE_ERR_GET_BITTIMING_CONST =  8,
-    CANDLE_ERR_PREPARE_READ        =  9,
-    CANDLE_ERR_SET_DEVICE_MODE     = 10,
-    CANDLE_ERR_SET_BITTIMING       = 11,
-    CANDLE_ERR_BITRATE_FCLK        = 12,
-    CANDLE_ERR_BITRATE_UNSUPPORTED = 13,
-    CANDLE_ERR_SEND_FRAME          = 14,
-    CANDLE_ERR_READ_TIMEOUT        = 15,
-    CANDLE_ERR_READ_WAIT           = 16,
-    CANDLE_ERR_READ_RESULT         = 17,
-    CANDLE_ERR_READ_SIZE           = 18,
-    CANDLE_ERR_SETUPDI_IF_DETAILS  = 19,
-    CANDLE_ERR_SETUPDI_IF_DETAILS2 = 20,
-    CANDLE_ERR_MALLOC              = 21,
-    CANDLE_ERR_PATH_LEN            = 22,
-    CANDLE_ERR_CLSID               = 23,
-    CANDLE_ERR_GET_DEVICES         = 24,
-    CANDLE_ERR_SETUPDI_IF_ENUM     = 25,
-    CANDLE_ERR_SET_TIMESTAMP_MODE  = 26,
-    CANDLE_ERR_DEV_OUT_OF_RANGE    = 27,
-    CANDLE_ERR_GET_TIMESTAMP       = 28,
-    CANDLE_ERR_SET_PIPE_RAW_IO     = 29,
-	CANDLE_ERR_GET_DEVICE_SPEED    = 30,
+	CANDLE_ERR_OK = 0,
+	CANDLE_ERR_CREATE_FILE = 1,
+	CANDLE_ERR_WINUSB_INITIALIZE = 2,
+	CANDLE_ERR_QUERY_INTERFACE = 3,
+	CANDLE_ERR_QUERY_PIPE = 4,
+	CANDLE_ERR_PARSE_IF_DESCR = 5,
+	CANDLE_ERR_SET_HOST_FORMAT = 6,
+	CANDLE_ERR_GET_DEVICE_INFO = 7,
+	CANDLE_ERR_GET_BITTIMING_CONST = 8,
+	CANDLE_ERR_PREPARE_READ = 9,
+	CANDLE_ERR_SET_DEVICE_MODE = 10,
+	CANDLE_ERR_SET_BITTIMING = 11,
+	CANDLE_ERR_BITRATE_FCLK = 12,
+	CANDLE_ERR_BITRATE_UNSUPPORTED = 13,
+	CANDLE_ERR_SEND_FRAME = 14,
+	CANDLE_ERR_READ_TIMEOUT = 15,
+	CANDLE_ERR_READ_WAIT = 16,
+	CANDLE_ERR_READ_RESULT = 17,
+	CANDLE_ERR_READ_SIZE = 18,
+	CANDLE_ERR_SETUPDI_IF_DETAILS = 19,
+	CANDLE_ERR_SETUPDI_IF_DETAILS2 = 20,
+	CANDLE_ERR_MALLOC = 21,
+	CANDLE_ERR_PATH_LEN = 22,
+	CANDLE_ERR_CLSID = 23,
+	CANDLE_ERR_GET_DEVICES = 24,
+	CANDLE_ERR_SETUPDI_IF_ENUM = 25,
+	CANDLE_ERR_SET_TIMESTAMP_MODE = 26,
+	CANDLE_ERR_DEV_OUT_OF_RANGE = 27,
+	CANDLE_ERR_GET_TIMESTAMP = 28,
+	CANDLE_ERR_SET_PIPE_RAW_IO = 29,
 } candle_err_t;
 
 #pragma pack(push,1)
@@ -159,6 +159,10 @@ DLL uint8_t * __stdcall candle_frame_data(candle_frame_t *frame);
 DLL uint32_t __stdcall candle_frame_timestamp_us(candle_frame_t *frame);
 
 DLL candle_err_t __stdcall candle_dev_last_error(candle_handle hdev);
+DLL const char * __stdcall candle_error_text(candle_err_t errnum);
+
+// This is a convenience function to initialize a single device and start a channel on it
+DLL candle_err_t __stdcall candle_init_single_device(uint8_t device_num, uint8_t device_channel, uint32_t bitrate, uint32_t channel_flags, candle_list_handle *plist, candle_handle *phdev);
 
 #ifdef __cplusplus
 }

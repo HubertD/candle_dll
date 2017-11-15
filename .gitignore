@@ -15,3 +15,5 @@
 *.lib
 *.exe
 *.opensdf
+candle_test/candle_test.vcxproj.user
+VisualStudio/candle_dll.vcxproj.user

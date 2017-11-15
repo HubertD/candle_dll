@@ -143,8 +143,8 @@ DLL bool __stdcall candle_list_free(candle_list_handle list)
 
 DLL bool __stdcall candle_list_length(candle_list_handle list, uint8_t *len)
 {
-    candle_list_t *l = (candle_list_t *)list;
-    *len = l->num_devices;
+	candle_list_t *l = (candle_list_t *)list;
+	*len = l->num_devices;
     return true;
 }
 
@@ -222,16 +222,6 @@ static bool candle_dev_interal_open(candle_handle hdev)
         goto close_handle;
     }
 
-	{
-		ULONG length = sizeof(dev->deviceSpeed);
-
-		if (!WinUsb_QueryDeviceInformation(dev->winUSBHandle, DEVICE_SPEED, &length, &dev->deviceSpeed))
-		{
-			dev->last_error = CANDLE_ERR_GET_DEVICE_SPEED;
-			goto winusb_free;
-		}
-	}
-
 	USB_INTERFACE_DESCRIPTOR ifaceDescriptor;
     if (!WinUsb_QueryInterfaceSettings(dev->winUSBHandle, 0, &ifaceDescriptor)) {
         dev->last_error = CANDLE_ERR_QUERY_INTERFACE;
@@ -251,10 +241,12 @@ static bool candle_dev_interal_open(candle_handle hdev)
 
         if (pipeInfo.PipeType == UsbdPipeTypeBulk && USB_ENDPOINT_DIRECTION_IN(pipeInfo.PipeId)) {
             dev->bulkInPipe = pipeInfo.PipeId;
-            pipes_found++;
+			dev->bulkInPipeInfo = pipeInfo;
+			pipes_found++;
         } else if (pipeInfo.PipeType == UsbdPipeTypeBulk && USB_ENDPOINT_DIRECTION_OUT(pipeInfo.PipeId)) {
             dev->bulkOutPipe = pipeInfo.PipeId;
-            pipes_found++;
+			dev->bulkOutPipeInfo = pipeInfo;
+			pipes_found++;
         } else {
             dev->last_error = CANDLE_ERR_PARSE_IF_DESCR;
             goto winusb_free;
@@ -267,13 +259,28 @@ static bool candle_dev_interal_open(candle_handle hdev)
         goto winusb_free;
     }
 
-    ULONG use_raw_io = 1;
-    if (!WinUsb_SetPipePolicy(dev->winUSBHandle, dev->bulkInPipe, RAW_IO, sizeof(use_raw_io), &use_raw_io)) {
-        dev->last_error = CANDLE_ERR_SET_PIPE_RAW_IO;
-        goto winusb_free;
-    } 
+	ULONG param = 1;
+	if (!WinUsb_SetPipePolicy(dev->winUSBHandle, dev->bulkInPipe, RAW_IO, sizeof(param), &param)) {
+		dev->last_error = CANDLE_ERR_SET_PIPE_RAW_IO;
+		goto winusb_free;
+	}
 
-    if (!candle_ctrl_set_host_format(dev)) {
+#if 0
+	param = 0;
+	if (!WinUsb_SetPipePolicy(dev->winUSBHandle, dev->bulkInPipe, ALLOW_PARTIAL_READS, sizeof(param), &param)) {
+		dev->last_error = CANDLE_ERR_SET_PIPE_RAW_IO;
+		goto winusb_free;
+	}
+
+	param = 1;
+	if (!WinUsb_SetPipePolicy(dev->winUSBHandle, dev->bulkInPipe, AUTO_FLUSH, sizeof(param), &param)) {
+		dev->last_error = CANDLE_ERR_SET_PIPE_RAW_IO;
+		goto winusb_free;
+	}
+#endif
+
+
+	if (!candle_ctrl_set_host_format(dev)) {
         goto winusb_free;
     }
 
@@ -308,11 +315,11 @@ close_handle:
 
 static bool candle_prepare_read(candle_device_t *dev, unsigned urb_num)
 {
-    bool rc = WinUsb_ReadPipe(
-        dev->winUSBHandle,
-        dev->bulkInPipe,
-        dev->rxurbs[urb_num].buf,
-        sizeof(dev->rxurbs[urb_num].buf),
+	bool rc = WinUsb_ReadPipe(
+		dev->winUSBHandle,
+		dev->bulkInPipe,
+		dev->rxurbs[urb_num].buf,
+		dev->bulkInPipeInfo.MaximumPacketSize,
         NULL,
         &dev->rxurbs[urb_num].ovl
     );
@@ -514,12 +521,19 @@ DLL bool __stdcall candle_frame_send(candle_handle hdev, uint8_t ch, candle_fram
     frame->echo_id = 0;
     frame->channel = ch;
 
+	uint8_t buf[64];
+
+	memset(buf, 0, sizeof(buf));
+
+	memcpy(buf, frame, sizeof(*frame));
+
     bool rc = WinUsb_WritePipe(
         dev->winUSBHandle,
         dev->bulkOutPipe,
-        (uint8_t*)frame,
-        sizeof(*frame),
-        &bytes_sent,
+        buf,
+		sizeof(*frame),
+//		dev->bulkOutPipeInfo.MaximumPacketSize,
+		&bytes_sent,
         0
     );
 
@@ -546,23 +560,27 @@ DLL bool __stdcall candle_frame_read(candle_handle hdev, candle_frame_t *frame, 
 
     DWORD urb_num = wait_result - WAIT_OBJECT_0;
     DWORD bytes_transfered;
+	DWORD last_error;
 
     if (!WinUsb_GetOverlappedResult(dev->winUSBHandle, &dev->rxurbs[urb_num].ovl, &bytes_transfered, false)) {
+		last_error = GetLastError();
         candle_prepare_read(dev, urb_num);
         dev->last_error = CANDLE_ERR_READ_RESULT;
         return false;
     }
 
+#if 0
 	// Check bytes transferred for size of frame and size of frame with no timestamp
 	if (bytes_transfered != sizeof(*frame) && bytes_transfered != (sizeof(*frame) - 4)) {
         candle_prepare_read(dev, urb_num);
         dev->last_error = CANDLE_ERR_READ_SIZE;
         return false;
     }
+#endif
 
 	memset(frame, 0, sizeof(*frame));
 
-    memcpy(frame, dev->rxurbs[urb_num].buf, bytes_transfered);
+    memcpy(frame, dev->rxurbs[urb_num].buf, bytes_transfered > sizeof(*frame) ? sizeof(*frame) : bytes_transfered);
 
     return candle_prepare_read(dev, urb_num);
 }
@@ -608,4 +626,136 @@ DLL uint8_t * __stdcall candle_frame_data(candle_frame_t *frame)
 DLL uint32_t __stdcall candle_frame_timestamp_us(candle_frame_t *frame)
 {
     return frame->timestamp_us;
+}
+
+static const char *err_text[]={
+	"CANDLE_ERR_OK",
+	"CANDLE_ERR_CREATE_FILE",
+	"CANDLE_ERR_WINUSB_INITIALIZE",
+	"CANDLE_ERR_QUERY_INTERFACE",
+	"CANDLE_ERR_QUERY_PIPE",
+	"CANDLE_ERR_PARSE_IF_DESCR",
+	"CANDLE_ERR_SET_HOST_FORMAT",
+	"CANDLE_ERR_GET_DEVICE_INFO",
+	"CANDLE_ERR_GET_BITTIMING_CONST",
+	"CANDLE_ERR_PREPARE_READ",
+	"CANDLE_ERR_SET_DEVICE_MODE",
+	"CANDLE_ERR_SET_BITTIMING",
+	"CANDLE_ERR_BITRATE_FCLK",
+	"CANDLE_ERR_BITRATE_UNSUPPORTED",
+	"CANDLE_ERR_SEND_FRAME",
+	"CANDLE_ERR_READ_TIMEOUT",
+	"CANDLE_ERR_READ_WAIT",
+	"CANDLE_ERR_READ_RESULT",
+	"CANDLE_ERR_READ_SIZE",
+	"CANDLE_ERR_SETUPDI_IF_DETAILS",
+	"CANDLE_ERR_SETUPDI_IF_DETAILS2",
+	"CANDLE_ERR_MALLOC",
+	"CANDLE_ERR_PATH_LEN",
+	"CANDLE_ERR_CLSID",
+	"CANDLE_ERR_GET_DEVICES",
+	"CANDLE_ERR_SETUPDI_IF_ENUM",
+	"CANDLE_ERR_SET_TIMESTAMP_MODE",
+	"CANDLE_ERR_DEV_OUT_OF_RANGE",
+	"CANDLE_ERR_GET_TIMESTAMP",
+	"CANDLE_ERR_SET_PIPE_RAW_IO",
+};
+
+DLL const char * __stdcall candle_error_text(candle_err_t errnum)
+{
+  if(errnum >= sizeof(err_text)/sizeof(err_text[0]))
+    return("CANDLE_ERR_INVALID_ERROR_CODE");
+
+  return err_text[errnum];
+}
+
+DLL candle_err_t __stdcall candle_init_single_device(uint8_t device_num, uint8_t device_channel, uint32_t bitrate, uint32_t channel_flags, candle_list_handle *plist, candle_handle *phdev)
+{
+	candle_err_t rval;
+	uint8_t len;
+	candle_devstate_t state;
+	uint8_t num_channels;
+	candle_capability_t cap;
+
+	if (!plist || !phdev)
+		return CANDLE_ERR_MALLOC;
+
+	*plist = NULL;
+	*phdev = NULL;
+
+	if (!candle_list_scan(plist)){
+		goto done;
+	}
+
+	if (!candle_list_length(*plist, &len)){
+		goto done;
+	}
+
+	if (!candle_dev_get(*plist, device_num, phdev)){
+		goto done;
+	}
+
+	if (!candle_dev_open(*phdev)){
+		goto done;
+	}
+
+	if (!candle_dev_get_state(*phdev, &state)){
+		goto done;
+	}
+
+	if (state != CANDLE_DEVSTATE_AVAIL){
+		goto done;
+	}
+
+	if (!candle_channel_count(*phdev, &num_channels)){
+		goto done;
+	}
+
+	if (num_channels <= device_channel){
+		goto done;
+	}
+
+	if (!candle_channel_get_capabilities(*phdev, device_channel, &cap)){
+		goto done;
+	}
+
+	if (!candle_channel_set_bitrate(*phdev, device_channel, bitrate))
+	{
+		goto done;
+	}
+
+	if (!candle_channel_start(*phdev, device_channel,
+		channel_flags)){
+		goto done;
+	}
+
+done:
+
+	{
+		candle_list_t *l;
+		candle_device_t *d;
+		l = *plist;
+		d = *phdev;
+
+		if (!*plist)
+			return CANDLE_ERR_MALLOC;
+
+		if (!d){
+			rval = l->last_error;
+			candle_list_free(*plist);
+			*plist = NULL;
+			return rval;
+		}
+
+		rval = d->last_error;
+		if (rval != CANDLE_ERR_OK){
+			candle_dev_close(d);
+			candle_dev_free(d);
+			candle_list_free(l);
+			*phdev = NULL;
+			*plist = NULL;
+		}
+
+		return rval;
+	}
 }
