@@ -98,11 +98,11 @@ bool candle_ctrl_set_timestamp_mode(candle_device_t *dev, bool enable_timestamps
     return rc;
 }
 
-bool candle_ctrl_set_device_mode(candle_device_t *dev, uint8_t channel, uint32_t mode, uint32_t flags)
+bool candle_ctrl_set_device_mode(candle_device_t *dev, uint8_t channel, uint32_t mode, candle_device_mode_flags_t device_mode_flags)
 {
     candle_device_mode_t dm;
     dm.mode = mode;
-    dm.flags = flags;
+    dm.flags = device_mode_flags;
 
     bool rc = usb_control_msg(
         dev->winUSBHandle,

@@ -44,14 +44,26 @@ typedef enum {
 } candle_frametype_t;
 
 typedef enum {
-	CANDLE_MODE_NORMAL                            = 0x00,
-    CANDLE_MODE_LISTEN_ONLY                       = 0x01,
-    CANDLE_MODE_LOOP_BACK                         = 0x02,
-    CANDLE_MODE_TRIPLE_SAMPLE                     = 0x04,
-    CANDLE_MODE_ONE_SHOT                          = 0x08,
-	CANDLE_MODE_HW_TIMESTAMP                      = 0x10,
-	CANDLE_MODE_PAD_PACKETS_TO_MAX_PACKET_SIZE    = 0x80
-} candle_mode_t;
+	CANDLE_MODE_NORMAL = 0x00,
+	CANDLE_MODE_LISTEN_ONLY = 0x01,
+	CANDLE_MODE_LOOP_BACK = 0x02,
+	CANDLE_MODE_TRIPLE_SAMPLE = 0x04,
+	CANDLE_MODE_ONE_SHOT = 0x08,
+	CANDLE_MODE_HW_TIMESTAMP = 0x10,
+	CANDLE_MODE_PAD_PKTS_TO_MAX_PKT_SIZE = 0x80
+} candle_device_mode_flags_t;
+
+typedef enum {
+	CANDLE_FEATURE_NORMAL = 0x00,
+	CANDLE_FEATURE_LISTEN_ONLY = 0x01,
+	CANDLE_FEATURE_LOOP_BACK = 0x02,
+	CANDLE_FEATURE_TRIPLE_SAMPLE = 0x04,
+	CANDLE_FEATURE_ONE_SHOT = 0x08,
+	CANDLE_FEATURE_HW_TIMESTAMP = 0x10,
+	CANDLE_FEATURE_IDENTIFY = 0x20,
+	CANDLE_FEATURE_USER_ID = 0x40,
+	CANDLE_FEATURE_PAD_PKTS_TO_MAX_PKT_SIZE = 0x80
+} candle_feature_t;
 
 typedef enum {
 	CANDLE_ERR_OK = 0,
@@ -84,6 +96,7 @@ typedef enum {
 	CANDLE_ERR_DEV_OUT_OF_RANGE = 27,
 	CANDLE_ERR_GET_TIMESTAMP = 28,
 	CANDLE_ERR_SET_PIPE_RAW_IO = 29,
+	CANDLE_ERR_DEVICE_FEATURE_UNAVAILABLE = 30,
 } candle_err_t;
 
 #pragma pack(push,1)
@@ -144,7 +157,7 @@ DLL bool __stdcall candle_channel_count(candle_handle hdev, uint8_t *num_channel
 DLL bool __stdcall candle_channel_get_capabilities(candle_handle hdev, uint8_t ch, candle_capability_t *cap);
 DLL bool __stdcall candle_channel_set_timing(candle_handle hdev, uint8_t ch, candle_bittiming_t *data);
 DLL bool __stdcall candle_channel_set_bitrate(candle_handle hdev, uint8_t ch, uint32_t bitrate);
-DLL bool __stdcall candle_channel_start(candle_handle hdev, uint8_t ch, uint32_t flags);
+DLL bool __stdcall candle_channel_start(candle_handle hdev, uint8_t ch, candle_device_mode_flags_t device_mode_flags);
 DLL bool __stdcall candle_channel_stop(candle_handle hdev, uint8_t ch);
 
 DLL bool __stdcall candle_frame_send(candle_handle hdev, uint8_t ch, candle_frame_t *frame);
@@ -162,7 +175,7 @@ DLL candle_err_t __stdcall candle_dev_last_error(candle_handle hdev);
 DLL const char * __stdcall candle_error_text(candle_err_t errnum);
 
 // This is a convenience function to initialize a single device and start a channel on it
-DLL candle_err_t __stdcall candle_init_single_device(uint8_t device_num, uint8_t device_channel, uint32_t bitrate, uint32_t channel_flags, candle_list_handle *plist, candle_handle *phdev);
+DLL candle_err_t __stdcall candle_init_single_device(uint8_t device_num, uint8_t device_channel, uint32_t bitrate, candle_device_mode_flags_t device_mode_flags, candle_list_handle *plist, candle_handle *phdev);
 
 #ifdef __cplusplus
 }

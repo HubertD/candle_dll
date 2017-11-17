@@ -18,5 +18,13 @@
     <ClCompile Include="candle_test.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="cmd_line.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="cmd_line.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

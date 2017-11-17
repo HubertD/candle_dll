@@ -2,6 +2,9 @@
 //
 
 #include <candle.h>
+
+#include "cmd_line.h"
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <conio.h>
@@ -75,10 +78,14 @@ double calc_filtered_rate(filtered_rate_t *filt,double now,unsigned num)
 }
 
 
-void print_can_frame(candle_frame_t *pframe)
+void print_can_frame(candle_frame_t *pframe,bool timestamp)
 {
 	int i,count;
-	printf("%d %8x %1d ",pframe->channel, pframe->can_id,pframe->can_dlc);
+
+	if (timestamp)
+		printf("%9.4f", pframe->timestamp_us / 1000000.0);
+	
+	printf("%8x %1d ",pframe->can_id,pframe->can_dlc);
 
 	count = pframe->can_dlc;
 	if (count > 8)
@@ -98,155 +105,18 @@ void close_candle(candle_list_handle list, candle_handle hdev)
 }
 
 
-void usage(const char *prog,const char *err)
-{
-}
 
-typedef struct{
-	unsigned device_number;
-	unsigned device_channel;
-	unsigned bitrate;
-
-	int canbus_id;
-
-	double print_period;
-
-	candle_frame_t send_frame;
-	bool do_send_frame;
-	double send_rate;
-}cmd_args_t;
-
-bool parse_arg(int argc, char *argv[], int i, void *pval, char *format,char *name)
-{
-	if (i == argc - 1){
-		printf("Missing %s\n", name);
-		return false;
-	}
-	i++;
-	if (sscanf(argv[i], format, pval) != 1){
-		printf("Invalid %s: %s\n", name, argv[i]);
-		return false;
-	}
-	return true;
-}
-
-bool parse_frame_arg(int argc, char *argv[], int *ip, candle_frame_t *frame)
-{
-	int i = *ip;
-	int byte_count;
-
-	if (i == argc - 1){
-		printf("Missing canbus id\n");
-		return false;
-	}
-
-	i++;
-
-	if (sscanf(argv[i], "%x", &frame->can_id) != 1){
-		printf("Invalid canbus id: %s\n", argv[i]);
-		*ip = i;
-		return false;
-	}
-
-	i++;
-
-	for (byte_count = 0; i < argc && argv[i][0] != '-'; ++byte_count, ++i){
-		if (byte_count >= 8){
-			printf("Too many can data bytes, max 8\n");
-			*ip = i;
-			return false;
-		}
-
-		if (sscanf(argv[i], "%hhx", &frame->data[byte_count]) != 1){
-			printf("Invalid can data byte #%d: %s\n", byte_count,argv[i]);
-			*ip = i;
-			return false;
-		}
-	}
-
-	frame->can_dlc = byte_count;
-	i--;
-	*ip = i;
-	return true;
-}
-
-bool parse_args(int argc, char *argv[], cmd_args_t *args)
+bool frame_id_match(candle_frame_t *frame, cmd_line_args_t *args)
 {
 	int i;
 
-	if (!args)
-		return false;
+	if (args->num_canbus_ids == 0)
+		return true;
 
-	memset(args, 0, sizeof(*args));
-	args->bitrate = 250000;
-	args->canbus_id = -1;
-	args->send_rate = 0;
-
-	for (i = 0; i < argc; ++i)
-	{
-		if (argv[i][0] == '-'){
-			switch (tolower(argv[i][1])){
-			case 'b':
-				if (!parse_arg(argc, argv, i, &args->bitrate, "%u", "bitrate"))
-					goto error;
-				i++;
-				break;
-
-			case 'c':
-				if (!parse_arg(argc, argv, i, &args->device_channel, "%u", "device channel"))
-					goto error;
-				i++;
-				break;
-
-			case 'i':
-				if (!parse_arg(argc, argv, i, &args->canbus_id, "%x", "canbus id"))
-					goto error;
-				i++;
-				break;
-
-			case 'n':
-				if (!parse_arg(argc, argv, i, &args->device_number, "%u", "device number"))
-					goto error;
-				i++;
-				break;
-
-			case 'p':
-				if (!parse_arg(argc, argv, i, &args->print_period, "%lf", "print period"))
-					goto error;
-				i++;
-				break;
-
-			case 'r':
-				if (!parse_arg(argc, argv, i, &args->send_rate, "%lf", "send rate"))
-					goto error;
-				i++;
-				break;
-
-			case 's':
-				if (!parse_frame_arg(argc, argv, &i, &args->send_frame))
-					goto error;
-				args->do_send_frame = true;
-				break;
-
-			default:
-				printf("Invalid arg %s\n", argv[i]);
-				goto error;
-				break;
-			}
-		}
+	for (i = 0; i < args->num_canbus_ids; ++i){
+		if (frame->can_id == args->canbus_ids[i])
+			return true;
 	}
-
-	return true;
-
-error:
-	printf("Usage: %s <options>\nOptions:", argv[0]);
-	printf("\t-b bitrate (default %d)\n", args->bitrate);
-	printf("\t-c device_channel (default %d)\n", args->device_channel);
-	printf("\t-i canbus_id in hex print only frames from this id, default off\n");
-	printf("\t-n device_number (default %d)\n", args->device_number);
-	printf("\t-p print_period (default %0.1f seconds)\n", args->print_period);
-	printf("\t-s canbus_id(hex) <byte(hex) byte(hex) ...> Frame to send (default none)\n");
-	printf("\t-r send_rate (default %0.1f frames/sec)\n", args->send_rate);
 
 	return false;
 }
@@ -260,52 +130,82 @@ int main(int argc, char* argv[])
 	filtered_rate_t tx_rate, rx_rate;
 	double last_print_time = 0;
 	double last_send_time = 0;
-	cmd_args_t args;
+	cmd_line_args_t args;
 	candle_err_t err;
 
 	memset(&tx_rate, 0, sizeof(tx_rate));
 	memset(&rx_rate, 0, sizeof(rx_rate));
 
+	set_default_args(&args);
+
 	if (!parse_args(argc, argv, &args))
 		return 1;
+
+	candle_device_mode_flags_t device_mode_flags = 0;
+
+	if (args.timestamp)
+		device_mode_flags |= CANDLE_MODE_HW_TIMESTAMP;
+
+	if (args.pad_pkts_to_max_pkt_size)
+		device_mode_flags |= CANDLE_MODE_PAD_PKTS_TO_MAX_PKT_SIZE;
 
 	printf("Starting can device %u channel %u at bitrate %d with print rate %.3f secs\n",
 		args.device_number, args.device_channel, args.print_period);
 
-	if (args.do_send_frame){
-		printf("Send Frame is:");
-		print_can_frame(&args.send_frame);
-		printf("\n");
-	}
+	printf("Device mode flags: ");
+
+	if (device_mode_flags & CANDLE_MODE_HW_TIMESTAMP)
+		printf("timestamp ");
+
+	if (device_mode_flags & CANDLE_MODE_PAD_PKTS_TO_MAX_PKT_SIZE)
+		printf("pad_pkts_to_max_pkt_size");
+
+	printf("\n");
 
 	err = candle_init_single_device(args.device_number, args.device_channel, args.bitrate,
-		CANDLE_MODE_PAD_PACKETS_TO_MAX_PACKET_SIZE, &list, &hdev);
+		device_mode_flags, &list, &hdev);
 
 	if (err != CANDLE_ERR_OK)
 		goto done;
 
-	printf("Hit q to exit, s to send frame\n");
+	if (args.num_send_frames > 0){
+		int i;
+		printf("Send Frames:\n");
+		for (i = 0; i < args.num_send_frames; ++i){
+			printf("#%2d: ",i);
+			print_can_frame(&args.send_frames[i], false);
+			printf("\n");
+		}
+	}
+
+	printf("Hit esc to exit, s to send frame\n");
 	
 	bool got_frame = false;
 	last_send_time = hi_res_time();
+	int next_send_frame = 0;
+
 	for (count = 0; 1 ;++count){
-		candle_frame_t frame;
+		candle_frame_t frame,match_frame;
 		double now;
 
 		if (_kbhit())
 		{
 			char c = _getch();
-			if (tolower(c) == 'q')
+			if (tolower(c) == 0x1b)
 				break;
 
 			if (tolower(c) == 's'){
-				if (args.do_send_frame){
-					candle_frame_send(hdev, args.device_channel, &args.send_frame);
-					printf("Sent: ");
-					print_can_frame(&args.send_frame);
-					printf("\n");
-					now = hi_res_time();
-					calc_filtered_rate(&tx_rate, now, 1);
+				if (args.num_send_frames > 0){
+					printf("Sending:\n");
+					for (int i = 0; i < args.num_send_frames; ++i){
+						candle_frame_send(hdev, args.device_channel, &args.send_frames[i]);
+						now = hi_res_time();
+						calc_filtered_rate(&tx_rate, now, 1);
+
+						printf("#%2d: ",i);
+						print_can_frame(&args.send_frames[i], false);
+						printf("\n");
+					}
 				}
 				else{
 					printf("\nNo send packet on command line\n");
@@ -314,12 +214,12 @@ int main(int argc, char* argv[])
 		}
 
 		err = CANDLE_ERR_OK;
-		if (candle_frame_read(hdev, &frame, (args.do_send_frame ? 1 : 1000))){
-			if (args.canbus_id == -1 || frame.can_id == args.canbus_id){
-				got_frame = true;
-
+		if (candle_frame_read(hdev, &frame, (args.num_send_frames > 0 ? 1 : 100))){
+			if (frame_id_match(&frame,&args)){
 				now = hi_res_time();
 				calc_filtered_rate(&rx_rate, now, 1);
+				match_frame = frame;
+				got_frame = 1;
 			}
 		}
 		else
@@ -331,7 +231,7 @@ int main(int argc, char* argv[])
 			}
 		}
 
-		if (args.send_rate > 0 && args.do_send_frame){
+		if (args.send_rate > 0 && args.num_send_frames > 0){
 			double dt;
 			double period = 1.0 / args.send_rate;
 			int i;
@@ -343,8 +243,12 @@ int main(int argc, char* argv[])
 				dt = now - last_send_time;
 
 				if (dt > period){
-					if (candle_frame_send(hdev, args.device_channel, &args.send_frame)){
+					if (next_send_frame >= args.num_send_frames - 1)
+						next_send_frame = 0;
+
+					if (candle_frame_send(hdev, args.device_channel, &args.send_frames[next_send_frame])){
 						calc_filtered_rate(&tx_rate, now, 1);
+						next_send_frame++;
 					}
 					last_send_time += period;
 				}
@@ -359,18 +263,15 @@ int main(int argc, char* argv[])
 		{
 			if (got_frame || args.print_period > 0)
 				printf("rx: %6.1f tx:%6.1f ", rx_rate.filtered_rate, tx_rate.filtered_rate);
-			if (got_frame){
-				if (args.canbus_id == -1 || frame.can_id == args.canbus_id){
-					printf("Fr:");
-					print_can_frame(&frame);
-				}
-			}
+
+			if (got_frame)
+				print_can_frame(&frame, args.timestamp);
+
 			if (got_frame || args.print_period > 0){
 				printf("\n");
 				last_print_time = now;
 			}
 			got_frame = false;
-
 		}
 
 		now = hi_res_time();
@@ -384,7 +285,7 @@ done:
 	if (err == CANDLE_ERR_OK)
 		printf("\nEverything OK\n");
 	else
-		printf("\nCandle Error: %s\n", candle_error_text(err));
+		printf("\nCandle usage: %s\n", candle_error_text(err));
 
 	close_candle(list, hdev);
 	return (err == CANDLE_ERR_OK ? 0 : 1);

@@ -199,10 +199,12 @@ static bool candle_dev_interal_open(candle_handle hdev)
 {
     candle_device_t *dev = (candle_device_t*)hdev;
 
-    memset(dev->rxevents, 0, sizeof(dev->rxevents));
+	memset(dev->rxevents, 0, sizeof(dev->rxevents));
     memset(dev->rxurbs, 0, sizeof(dev->rxurbs));
 
-    dev->deviceHandle = CreateFile(
+	dev->device_mode_flags = 0;
+
+	dev->deviceHandle = CreateFile(
         dev->path,
         GENERIC_WRITE | GENERIC_READ,
         FILE_SHARE_WRITE | FILE_SHARE_READ,
@@ -497,11 +499,23 @@ DLL bool __stdcall candle_channel_set_bitrate(candle_handle hdev, uint8_t ch, ui
     return candle_ctrl_set_bittiming(dev, ch, &t);
 }
 
-DLL bool __stdcall candle_channel_start(candle_handle hdev, uint8_t ch, uint32_t flags)
+DLL bool __stdcall candle_channel_start(candle_handle hdev, uint8_t ch, candle_device_mode_flags_t device_mode_flags)
 {
     // TODO ensure device is open, check channel count..
     candle_device_t *dev = (candle_device_t*)hdev;
-    return candle_ctrl_set_device_mode(dev, ch, CANDLE_DEVMODE_START, flags);
+
+	// Make sure we have the features we are trying to use
+	if (device_mode_flags & ~dev->bt_const.feature){
+		dev->last_error = CANDLE_ERR_DEVICE_FEATURE_UNAVAILABLE;
+		return false;
+	}
+
+	bool rval = candle_ctrl_set_device_mode(dev, ch, CANDLE_DEVMODE_START, device_mode_flags);
+
+	if (rval)
+		dev->device_mode_flags = device_mode_flags;
+
+	return rval;
 }
 
 DLL bool __stdcall candle_channel_stop(candle_handle hdev, uint8_t ch)
@@ -531,8 +545,8 @@ DLL bool __stdcall candle_frame_send(candle_handle hdev, uint8_t ch, candle_fram
         dev->winUSBHandle,
         dev->bulkOutPipe,
         buf,
-		sizeof(*frame),
-//		dev->bulkOutPipeInfo.MaximumPacketSize,
+		(dev->device_mode_flags & CANDLE_MODE_PAD_PKTS_TO_MAX_PKT_SIZE ?
+		dev->bulkOutPipeInfo.MaximumPacketSize : sizeof(*frame)),
 		&bytes_sent,
         0
     );
@@ -659,6 +673,7 @@ static const char *err_text[]={
 	"CANDLE_ERR_DEV_OUT_OF_RANGE",
 	"CANDLE_ERR_GET_TIMESTAMP",
 	"CANDLE_ERR_SET_PIPE_RAW_IO",
+	"CANDLE_ERR_DEVICE_CAPABILITY_UNAVAILABLE",
 };
 
 DLL const char * __stdcall candle_error_text(candle_err_t errnum)
@@ -669,7 +684,7 @@ DLL const char * __stdcall candle_error_text(candle_err_t errnum)
   return err_text[errnum];
 }
 
-DLL candle_err_t __stdcall candle_init_single_device(uint8_t device_num, uint8_t device_channel, uint32_t bitrate, uint32_t channel_flags, candle_list_handle *plist, candle_handle *phdev)
+DLL candle_err_t __stdcall candle_init_single_device(uint8_t device_num, uint8_t device_channel, uint32_t bitrate, candle_device_mode_flags_t device_mode_flags, candle_list_handle *plist, candle_handle *phdev)
 {
 	candle_err_t rval;
 	uint8_t len;
@@ -724,8 +739,7 @@ DLL candle_err_t __stdcall candle_init_single_device(uint8_t device_num, uint8_t
 		goto done;
 	}
 
-	if (!candle_channel_start(*phdev, device_channel,
-		channel_flags)){
+	if (!candle_channel_start(*phdev, device_channel,device_mode_flags)){
 		goto done;
 	}
 

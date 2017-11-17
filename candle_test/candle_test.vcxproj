@@ -80,11 +80,15 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="candle_test.c" />
+    <ClCompile Include="cmd_line.c" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\VisualStudio\candle_dll.vcxproj">
       <Project>{aaa1131f-0d30-470b-b620-074081d55a33}</Project>
     </ProjectReference>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="cmd_line.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
