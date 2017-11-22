@@ -195,7 +195,7 @@ DLL wchar_t * __stdcall candle_dev_get_path(candle_handle hdev)
     }
 }
 
-static bool candle_dev_interal_open(candle_handle hdev)
+static bool candle_dev_internal_open(candle_handle hdev)
 {
     candle_device_t *dev = (candle_device_t*)hdev;
 
@@ -319,16 +319,25 @@ static bool candle_prepare_read(candle_device_t *dev, unsigned urb_num)
 	}
 }
 
+// Close urbs correctly or we get stuck in CloseHandle(dev->deviceHandle)
+static void close_urb(candle_device_t *dev,candle_tx_rx_urb *urb)
+{
+	DWORD result = CancelIoEx(dev->deviceHandle, &urb->ovl);
+	if (result || GetLastError() != ERROR_NOT_FOUND){
+		DWORD number_of_bytes;
+		result = GetOverlappedResult(dev->deviceHandle, &urb->ovl, &number_of_bytes, TRUE);
+	}
+}
+
 static bool candle_close_tx_rx_urbs(candle_device_t *dev)
 {
-	// Wait for transmit events to finish or we get stuck in CloseHandle for the device
-	DWORD wait_result = WaitForMultipleObjects(CANDLE_URB_COUNT, dev->txevents, TRUE, 100);
-
 	for (unsigned i = 0; i<CANDLE_URB_COUNT; i++) {
 		if (dev->txevents[i] != NULL) {
+			close_urb(dev, &dev->txurbs[i]);
 			CloseHandle(dev->txevents[i]);
 		}
 		if (dev->rxevents[i] != NULL) {
+			close_urb(dev, &dev->rxurbs[i]);
 			CloseHandle(dev->rxevents[i]);
 		}
 	}
@@ -340,7 +349,7 @@ DLL bool __stdcall candle_dev_open(candle_handle hdev)
 {
     candle_device_t *dev = (candle_device_t*)hdev;
 
-    if (candle_dev_interal_open(dev)) {
+    if (candle_dev_internal_open(dev)) {
 		for (unsigned i = 0; i<CANDLE_URB_COUNT; i++) {
 			HANDLE ev = CreateEvent(NULL, true, false, NULL);
 			dev->txevents[i] = ev;

@@ -65,7 +65,7 @@ typedef struct {
     OVERLAPPED ovl;
     uint8_t buf[64];  // Set this to max packet size for full speed usb.  We may use less
 	uint32_t send_size;
-} canlde_tx_rx_urb;
+} candle_tx_rx_urb;
 
 typedef struct {
     wchar_t path[256];
@@ -85,11 +85,11 @@ typedef struct {
     candle_device_config_t dconf;
     candle_capability_t bt_const;
 
-	canlde_tx_rx_urb txurbs[CANDLE_URB_COUNT];
+	candle_tx_rx_urb txurbs[CANDLE_URB_COUNT];
 	HANDLE txevents[CANDLE_URB_COUNT];
 	uint32_t txurbs_in_use;
 
-	canlde_tx_rx_urb rxurbs[CANDLE_URB_COUNT];
+	candle_tx_rx_urb rxurbs[CANDLE_URB_COUNT];
 	HANDLE rxevents[CANDLE_URB_COUNT];
 
 	candle_device_mode_flags_t device_mode_flags;
