@@ -83,7 +83,7 @@ void print_can_frame(candle_frame_t *pframe,bool timestamp)
 	int i,count;
 
 	if (timestamp)
-		printf("%9.4f", pframe->timestamp_us / 1000000.0);
+		printf("%9.4f ", pframe->timestamp_us / 1000000.0);
 	
 	printf("%8x %1d ",pframe->can_id,pframe->can_dlc);
 
@@ -198,12 +198,14 @@ int main(int argc, char* argv[])
 				if (args.num_send_frames > 0){
 					printf("Sending:\n");
 					for (int i = 0; i < args.num_send_frames; ++i){
-						candle_frame_send(hdev, args.device_channel, &args.send_frames[i]);
 						now = hi_res_time();
+						args.send_frames[i].timestamp_us = (uint32_t)(now * 1000000);
+						candle_frame_send(hdev, args.device_channel, &args.send_frames[i],true,1000);
 						calc_filtered_rate(&tx_rate, now, 1);
-
-						printf("#%2d: ",i);
-						print_can_frame(&args.send_frames[i], false);
+					}
+					for (int i = 0; i < args.num_send_frames; ++i){
+						printf("#%2d: ", i);
+						print_can_frame(&args.send_frames[i], args.timestamp);
 						printf("\n");
 					}
 				}
@@ -235,20 +237,25 @@ int main(int argc, char* argv[])
 			double dt;
 			double period = 1.0 / args.send_rate;
 			int i;
+			static int debug_print = 0;
 
-			for (i = 0; i < 2;++i)
+			for (i = 0; i < args.num_send_frames; ++i)
 			{
 				now = hi_res_time();
-
 				dt = now - last_send_time;
 
 				if (dt > period){
 					if (next_send_frame >= args.num_send_frames - 1)
 						next_send_frame = 0;
 
-					if (candle_frame_send(hdev, args.device_channel, &args.send_frames[next_send_frame])){
+					args.send_frames[next_send_frame].timestamp_us = (uint32_t)(now * 1000000);
+
+					if (candle_frame_send(hdev, args.device_channel, &args.send_frames[next_send_frame],false,1000)){
 						calc_filtered_rate(&tx_rate, now, 1);
 						next_send_frame++;
+					}
+					else{
+						printf("Send Failed\n");
 					}
 					last_send_time += period;
 				}

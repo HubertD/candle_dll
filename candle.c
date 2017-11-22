@@ -199,8 +199,12 @@ static bool candle_dev_interal_open(candle_handle hdev)
 {
     candle_device_t *dev = (candle_device_t*)hdev;
 
+	memset(dev->txevents, 0, sizeof(dev->txevents));
+	memset(dev->txurbs, 0, sizeof(dev->txurbs));
+	dev->txurbs_in_use = 0;
+
 	memset(dev->rxevents, 0, sizeof(dev->rxevents));
-    memset(dev->rxurbs, 0, sizeof(dev->rxurbs));
+	memset(dev->rxurbs, 0, sizeof(dev->rxurbs));
 
 	dev->device_mode_flags = 0;
 
@@ -267,30 +271,9 @@ static bool candle_dev_interal_open(candle_handle hdev)
 		goto winusb_free;
 	}
 
-#if 0
-	param = 0;
-	if (!WinUsb_SetPipePolicy(dev->winUSBHandle, dev->bulkInPipe, ALLOW_PARTIAL_READS, sizeof(param), &param)) {
-		dev->last_error = CANDLE_ERR_SET_PIPE_RAW_IO;
-		goto winusb_free;
-	}
-
-	param = 1;
-	if (!WinUsb_SetPipePolicy(dev->winUSBHandle, dev->bulkInPipe, AUTO_FLUSH, sizeof(param), &param)) {
-		dev->last_error = CANDLE_ERR_SET_PIPE_RAW_IO;
-		goto winusb_free;
-	}
-#endif
-
-
 	if (!candle_ctrl_set_host_format(dev)) {
         goto winusb_free;
     }
-
-#if 0
-    if (!candle_ctrl_set_timestamp_mode(dev, true)) {
-        goto winusb_free;
-	}
-#endif
 
     if (!candle_ctrl_get_config(dev, &dev->dconf)) {
         goto winusb_free;
@@ -322,26 +305,33 @@ static bool candle_prepare_read(candle_device_t *dev, unsigned urb_num)
 		dev->bulkInPipe,
 		dev->rxurbs[urb_num].buf,
 		dev->bulkInPipeInfo.MaximumPacketSize,
-        NULL,
-        &dev->rxurbs[urb_num].ovl
-    );
+		NULL,
+		&dev->rxurbs[urb_num].ovl
+		);
 
-    if (rc || (GetLastError()!=ERROR_IO_PENDING)) {
-        dev->last_error = CANDLE_ERR_PREPARE_READ;
-        return false;
-    } else {
-        dev->last_error = CANDLE_ERR_OK;
-        return true;
-    }
+	if (rc || (GetLastError() != ERROR_IO_PENDING)) {
+		dev->last_error = CANDLE_ERR_PREPARE_READ;
+		return false;
+	}
+	else {
+		dev->last_error = CANDLE_ERR_OK;
+		return true;
+	}
 }
 
-static bool candle_close_rxurbs(candle_device_t *dev)
+static bool candle_close_tx_rx_urbs(candle_device_t *dev)
 {
-    for (unsigned i=0; i<CANDLE_URB_COUNT; i++) {
-        if (dev->rxevents[i] != NULL) {
-            CloseHandle(dev->rxevents[i]);
-        }
-    }
+	// Wait for transmit events to finish or we get stuck in CloseHandle for the device
+	DWORD wait_result = WaitForMultipleObjects(CANDLE_URB_COUNT, dev->txevents, TRUE, 100);
+
+	for (unsigned i = 0; i<CANDLE_URB_COUNT; i++) {
+		if (dev->txevents[i] != NULL) {
+			CloseHandle(dev->txevents[i]);
+		}
+		if (dev->rxevents[i] != NULL) {
+			CloseHandle(dev->rxevents[i]);
+		}
+	}
     return true;
 }
 
@@ -351,16 +341,21 @@ DLL bool __stdcall candle_dev_open(candle_handle hdev)
     candle_device_t *dev = (candle_device_t*)hdev;
 
     if (candle_dev_interal_open(dev)) {
-        for (unsigned i=0; i<CANDLE_URB_COUNT; i++) {
-            HANDLE ev = CreateEvent(NULL, true, false, NULL);
-            dev->rxevents[i] = ev;
-            dev->rxurbs[i].ovl.hEvent = ev;
-            if (!candle_prepare_read(dev, i)) {
-                candle_close_rxurbs(dev);
-                return false; // keep last_error from prepare_read call
-            }
-        }
-        dev->last_error = CANDLE_ERR_OK;
+		for (unsigned i = 0; i<CANDLE_URB_COUNT; i++) {
+			HANDLE ev = CreateEvent(NULL, true, false, NULL);
+			dev->txevents[i] = ev;
+			dev->txurbs[i].ovl.hEvent = ev;
+		}
+		for (unsigned i = 0; i<CANDLE_URB_COUNT; i++) {
+			HANDLE ev = CreateEvent(NULL, true, false, NULL);
+			dev->rxevents[i] = ev;
+			dev->rxurbs[i].ovl.hEvent = ev;
+			if (!candle_prepare_read(dev, i)) {
+				candle_close_tx_rx_urbs(dev);
+				return false; // keep last_error from prepare_read call
+			}
+		}
+		dev->last_error = CANDLE_ERR_OK;
         return true;
     } else {
         return false; // keep last_error from open_device call
@@ -380,7 +375,7 @@ DLL bool __stdcall candle_dev_close(candle_handle hdev)
 	if (!dev)
 		return true;
 
-    candle_close_rxurbs(dev);
+    candle_close_tx_rx_urbs(dev);
 	
 	// Check handle to see if it is initialized before we free it
 	if (dev->winUSBHandle)
@@ -525,7 +520,62 @@ DLL bool __stdcall candle_channel_stop(candle_handle hdev, uint8_t ch)
     return candle_ctrl_set_device_mode(dev, ch, CANDLE_DEVMODE_RESET, 0);
 }
 
-DLL bool __stdcall candle_frame_send(candle_handle hdev, uint8_t ch, candle_frame_t *frame)
+static bool check_write_result(candle_device_t *dev, uint32_t urb_num)
+{
+	bool rc;
+	DWORD bytes_transferred;
+
+	rc = WinUsb_GetOverlappedResult(dev->winUSBHandle, &dev->txurbs[urb_num].ovl, &bytes_transferred, true);
+	if (!rc){
+		dev->last_error = CANDLE_ERR_WRITE_RESULT;
+		return false;
+	}
+
+	if (bytes_transferred != dev->txurbs[urb_num].send_size){
+		dev->last_error = CANDLE_ERR_WRITE_SIZE;
+		return false;
+	}
+
+	return true;
+}
+
+static DWORD find_free_txurb(candle_device_t *dev, uint32_t timeout)
+{
+	DWORD urb_num;
+
+	if (dev->txurbs_in_use == 0){
+		dev->txurbs_in_use++;
+		return 0;
+	}
+
+	DWORD wait_result = WaitForMultipleObjects(CANDLE_URB_COUNT, dev->txevents, false, 0);
+	if (wait_result == WAIT_TIMEOUT) {
+		if (dev->txurbs_in_use < CANDLE_URB_COUNT){
+			dev->txurbs_in_use++;
+			return dev->txurbs_in_use - 1;
+		}
+		wait_result = WaitForMultipleObjects(CANDLE_URB_COUNT, dev->txevents, false, timeout);
+		if (wait_result == WAIT_TIMEOUT) {
+			dev->last_error = CANDLE_ERR_WRITE_TIMEOUT;
+			return 0xffffffff;
+		}
+	}
+
+	if ((wait_result < WAIT_OBJECT_0) || (wait_result >= WAIT_OBJECT_0 + CANDLE_URB_COUNT)) {
+		dev->last_error = CANDLE_ERR_WRITE_WAIT;
+		return 0xffffffff;
+	}
+
+	urb_num = wait_result - WAIT_OBJECT_0;
+
+	if (!check_write_result(dev, urb_num)){
+		return 0xffffffff;
+	}
+
+	return urb_num;
+}
+
+DLL bool __stdcall candle_frame_send(candle_handle hdev, uint8_t ch, candle_frame_t *frame,bool wait_send, uint32_t timeout_ms)
 {
     // TODO ensure device is open, check channel count..
     candle_device_t *dev = (candle_device_t*)hdev;
@@ -535,25 +585,55 @@ DLL bool __stdcall candle_frame_send(candle_handle hdev, uint8_t ch, candle_fram
     frame->echo_id = 0;
     frame->channel = ch;
 
-	uint8_t buf[64];
+	DWORD urb_num;
+	urb_num = find_free_txurb(dev, timeout_ms);
 
-	memset(buf, 0, sizeof(buf));
+	if (urb_num == 0xffffffff)
+		return false;
 
-	memcpy(buf, frame, sizeof(*frame));
+	uint32_t send_size = sizeof(*frame);
 
-    bool rc = WinUsb_WritePipe(
-        dev->winUSBHandle,
-        dev->bulkOutPipe,
-        buf,
-		(dev->device_mode_flags & CANDLE_MODE_PAD_PKTS_TO_MAX_PKT_SIZE ?
-		dev->bulkOutPipeInfo.MaximumPacketSize : sizeof(*frame)),
+	dev->txurbs[urb_num].send_size = send_size;
+
+	memcpy(dev->txurbs[urb_num].buf, frame, send_size);
+
+	bool rc = WinUsb_WritePipe(
+		dev->winUSBHandle,
+		dev->bulkOutPipe,
+		dev->txurbs[urb_num].buf,
+		send_size,
 		&bytes_sent,
-        0
+		&dev->txurbs[urb_num].ovl
     );
 
-    dev->last_error = rc ? CANDLE_ERR_OK : CANDLE_ERR_SEND_FRAME;
-    return rc;
+	DWORD err = GetLastError();
 
+	// Overlapped write result returns false with error code ERROR_IO_PENDING even if everything is OK
+	if (err == ERROR_IO_PENDING)
+		rc = true;
+
+	if (!rc){
+		dev->last_error = CANDLE_ERR_SEND_FRAME;
+		return rc;
+	}
+
+	if (wait_send)
+	{
+		DWORD result = WaitForSingleObject(dev->txevents[urb_num], timeout_ms);
+		if (result == WAIT_TIMEOUT) {
+			dev->last_error = CANDLE_ERR_WRITE_TIMEOUT;
+			return false;
+		}
+		if (result != WAIT_OBJECT_0)
+		{
+			dev->last_error = CANDLE_ERR_WRITE_WAIT;
+			return false;
+		}
+
+		return check_write_result(dev, urb_num);
+	}
+
+    return rc;
 }
 
 DLL bool __stdcall candle_frame_read(candle_handle hdev, candle_frame_t *frame, uint32_t timeout_ms)
@@ -561,19 +641,19 @@ DLL bool __stdcall candle_frame_read(candle_handle hdev, candle_frame_t *frame, 
     // TODO ensure device is open..
     candle_device_t *dev = (candle_device_t*)hdev;
 
-    DWORD wait_result = WaitForMultipleObjects(CANDLE_URB_COUNT, dev->rxevents, false, timeout_ms);
-    if (wait_result == WAIT_TIMEOUT) {
-        dev->last_error = CANDLE_ERR_READ_TIMEOUT;
-        return false;
-    }
+	DWORD wait_result = WaitForMultipleObjects(CANDLE_URB_COUNT, dev->rxevents, false, timeout_ms);
+	if (wait_result == WAIT_TIMEOUT) {
+		dev->last_error = CANDLE_ERR_READ_TIMEOUT;
+		return false;
+	}
 
-    if ( (wait_result < WAIT_OBJECT_0) || (wait_result >= WAIT_OBJECT_0 + CANDLE_URB_COUNT) ) {
-        dev->last_error = CANDLE_ERR_READ_WAIT;
-        return false;
-    }
+	if ((wait_result < WAIT_OBJECT_0) || (wait_result >= WAIT_OBJECT_0 + CANDLE_URB_COUNT)) {
+		dev->last_error = CANDLE_ERR_READ_WAIT;
+		return false;
+	}
 
-    DWORD urb_num = wait_result - WAIT_OBJECT_0;
-    DWORD bytes_transfered;
+	DWORD urb_num = wait_result - WAIT_OBJECT_0;
+	DWORD bytes_transfered;
 	DWORD last_error;
 
     if (!WinUsb_GetOverlappedResult(dev->winUSBHandle, &dev->rxurbs[urb_num].ovl, &bytes_transfered, false)) {
@@ -674,6 +754,10 @@ static const char *err_text[]={
 	"CANDLE_ERR_GET_TIMESTAMP",
 	"CANDLE_ERR_SET_PIPE_RAW_IO",
 	"CANDLE_ERR_DEVICE_CAPABILITY_UNAVAILABLE",
+	"CANDLE_ERR_WRITE_WAIT",
+	"CANDLE_ERR_WRITE_TIMEOUT",
+	"CANDLE_ERR_WRITE_RESULT",
+	"CANDLE_ERR_WRITE_SIZE",
 };
 
 DLL const char * __stdcall candle_error_text(candle_err_t errnum)

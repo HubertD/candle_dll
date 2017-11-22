@@ -97,6 +97,10 @@ typedef enum {
 	CANDLE_ERR_GET_TIMESTAMP = 28,
 	CANDLE_ERR_SET_PIPE_RAW_IO = 29,
 	CANDLE_ERR_DEVICE_FEATURE_UNAVAILABLE = 30,
+	CANDLE_ERR_WRITE_WAIT = 31,
+	CANDLE_ERR_WRITE_TIMEOUT = 32,
+	CANDLE_ERR_WRITE_RESULT = 33,
+	CANDLE_ERR_WRITE_SIZE = 34,
 } candle_err_t;
 
 #pragma pack(push,1)
@@ -160,7 +164,7 @@ DLL bool __stdcall candle_channel_set_bitrate(candle_handle hdev, uint8_t ch, ui
 DLL bool __stdcall candle_channel_start(candle_handle hdev, uint8_t ch, candle_device_mode_flags_t device_mode_flags);
 DLL bool __stdcall candle_channel_stop(candle_handle hdev, uint8_t ch);
 
-DLL bool __stdcall candle_frame_send(candle_handle hdev, uint8_t ch, candle_frame_t *frame);
+DLL bool __stdcall candle_frame_send(candle_handle hdev, uint8_t ch, candle_frame_t *frame,bool wait_send,uint32_t timeout_ms);
 DLL bool __stdcall candle_frame_read(candle_handle hdev, candle_frame_t *frame, uint32_t timeout_ms);
 
 DLL candle_frametype_t __stdcall candle_frame_type(candle_frame_t *frame);
