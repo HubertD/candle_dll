@@ -44,57 +44,76 @@ typedef enum {
 } candle_frametype_t;
 
 typedef enum {
-    CANDLE_MODE_NORMAL        = 0x00,
-    CANDLE_MODE_LISTEN_ONLY   = 0x01,
-    CANDLE_MODE_LOOP_BACK     = 0x02,
-    CANDLE_MODE_TRIPLE_SAMPLE = 0x04,
-    CANDLE_MODE_ONE_SHOT      = 0x08
-} candle_mode_t;
+	CANDLE_MODE_NORMAL = 0x00,
+	CANDLE_MODE_LISTEN_ONLY = 0x01,
+	CANDLE_MODE_LOOP_BACK = 0x02,
+	CANDLE_MODE_TRIPLE_SAMPLE = 0x04,
+	CANDLE_MODE_ONE_SHOT = 0x08,
+	CANDLE_MODE_HW_TIMESTAMP = 0x10,
+	CANDLE_MODE_PAD_PKTS_TO_MAX_PKT_SIZE = 0x80
+} candle_device_mode_flags_t;
 
 typedef enum {
-    CANDLE_ERR_OK                  =  0,
-    CANDLE_ERR_CREATE_FILE         =  1,
-    CANDLE_ERR_WINUSB_INITIALIZE   =  2,
-    CANDLE_ERR_QUERY_INTERFACE     =  3,
-    CANDLE_ERR_QUERY_PIPE          =  4,
-    CANDLE_ERR_PARSE_IF_DESCR      =  5,
-    CANDLE_ERR_SET_HOST_FORMAT     =  6,
-    CANDLE_ERR_GET_DEVICE_INFO     =  7,
-    CANDLE_ERR_GET_BITTIMING_CONST =  8,
-    CANDLE_ERR_PREPARE_READ        =  9,
-    CANDLE_ERR_SET_DEVICE_MODE     = 10,
-    CANDLE_ERR_SET_BITTIMING       = 11,
-    CANDLE_ERR_BITRATE_FCLK        = 12,
-    CANDLE_ERR_BITRATE_UNSUPPORTED = 13,
-    CANDLE_ERR_SEND_FRAME          = 14,
-    CANDLE_ERR_READ_TIMEOUT        = 15,
-    CANDLE_ERR_READ_WAIT           = 16,
-    CANDLE_ERR_READ_RESULT         = 17,
-    CANDLE_ERR_READ_SIZE           = 18,
-    CANDLE_ERR_SETUPDI_IF_DETAILS  = 19,
-    CANDLE_ERR_SETUPDI_IF_DETAILS2 = 20,
-    CANDLE_ERR_MALLOC              = 21,
-    CANDLE_ERR_PATH_LEN            = 22,
-    CANDLE_ERR_CLSID               = 23,
-    CANDLE_ERR_GET_DEVICES         = 24,
-    CANDLE_ERR_SETUPDI_IF_ENUM     = 25,
-    CANDLE_ERR_SET_TIMESTAMP_MODE  = 26,
-    CANDLE_ERR_DEV_OUT_OF_RANGE    = 27,
-    CANDLE_ERR_GET_TIMESTAMP       = 28,
-    CANDLE_ERR_SET_PIPE_RAW_IO     = 29,
+	CANDLE_FEATURE_NORMAL = 0x00,
+	CANDLE_FEATURE_LISTEN_ONLY = 0x01,
+	CANDLE_FEATURE_LOOP_BACK = 0x02,
+	CANDLE_FEATURE_TRIPLE_SAMPLE = 0x04,
+	CANDLE_FEATURE_ONE_SHOT = 0x08,
+	CANDLE_FEATURE_HW_TIMESTAMP = 0x10,
+	CANDLE_FEATURE_IDENTIFY = 0x20,
+	CANDLE_FEATURE_USER_ID = 0x40,
+	CANDLE_FEATURE_PAD_PKTS_TO_MAX_PKT_SIZE = 0x80
+} candle_feature_t;
+
+typedef enum {
+	CANDLE_ERR_OK = 0,
+	CANDLE_ERR_CREATE_FILE = 1,
+	CANDLE_ERR_WINUSB_INITIALIZE = 2,
+	CANDLE_ERR_QUERY_INTERFACE = 3,
+	CANDLE_ERR_QUERY_PIPE = 4,
+	CANDLE_ERR_PARSE_IF_DESCR = 5,
+	CANDLE_ERR_SET_HOST_FORMAT = 6,
+	CANDLE_ERR_GET_DEVICE_INFO = 7,
+	CANDLE_ERR_GET_BITTIMING_CONST = 8,
+	CANDLE_ERR_PREPARE_READ = 9,
+	CANDLE_ERR_SET_DEVICE_MODE = 10,
+	CANDLE_ERR_SET_BITTIMING = 11,
+	CANDLE_ERR_BITRATE_FCLK = 12,
+	CANDLE_ERR_BITRATE_UNSUPPORTED = 13,
+	CANDLE_ERR_SEND_FRAME = 14,
+	CANDLE_ERR_READ_TIMEOUT = 15,
+	CANDLE_ERR_READ_WAIT = 16,
+	CANDLE_ERR_READ_RESULT = 17,
+	CANDLE_ERR_READ_SIZE = 18,
+	CANDLE_ERR_SETUPDI_IF_DETAILS = 19,
+	CANDLE_ERR_SETUPDI_IF_DETAILS2 = 20,
+	CANDLE_ERR_MALLOC = 21,
+	CANDLE_ERR_PATH_LEN = 22,
+	CANDLE_ERR_CLSID = 23,
+	CANDLE_ERR_GET_DEVICES = 24,
+	CANDLE_ERR_SETUPDI_IF_ENUM = 25,
+	CANDLE_ERR_SET_TIMESTAMP_MODE = 26,
+	CANDLE_ERR_DEV_OUT_OF_RANGE = 27,
+	CANDLE_ERR_GET_TIMESTAMP = 28,
+	CANDLE_ERR_SET_PIPE_RAW_IO = 29,
+	CANDLE_ERR_DEVICE_FEATURE_UNAVAILABLE = 30,
+	CANDLE_ERR_WRITE_WAIT = 31,
+	CANDLE_ERR_WRITE_TIMEOUT = 32,
+	CANDLE_ERR_WRITE_RESULT = 33,
+	CANDLE_ERR_WRITE_SIZE = 34,
 } candle_err_t;
 
 #pragma pack(push,1)
 
 typedef struct {
-    uint32_t echo_id;
-    uint32_t can_id;
-    uint8_t can_dlc;
-    uint8_t channel;
-    uint8_t flags;
-    uint8_t reserved;
-    uint8_t data[8];
-    uint32_t timestamp_us;
+	uint32_t echo_id;
+	uint32_t can_id;
+	uint8_t can_dlc;
+	uint8_t channel;
+	uint8_t flags;
+	uint8_t reserved;
+	uint8_t data[8];
+	uint32_t timestamp_us;
 } candle_frame_t;
 
 typedef struct {
@@ -120,44 +139,47 @@ typedef struct {
 
 #pragma pack(pop)
 
-
 #ifdef CANDLE_API_LIBRARY
 #define DLL __declspec(dllexport)
 #else
 #define DLL __declspec(dllimport)
 #endif
 
-bool __stdcall DLL candle_list_scan(candle_list_handle *list);
-bool __stdcall DLL candle_list_free(candle_list_handle list);
-bool __stdcall DLL candle_list_length(candle_list_handle list, uint8_t *len);
+DLL bool __stdcall candle_list_scan(candle_list_handle *list);
+DLL bool __stdcall candle_list_free(candle_list_handle list);
+DLL bool __stdcall candle_list_length(candle_list_handle list, uint8_t *len);
 
-bool __stdcall DLL candle_dev_get(candle_list_handle list, uint8_t dev_num, candle_handle *hdev);
-bool __stdcall DLL candle_dev_get_state(candle_handle hdev, candle_devstate_t *state);
-wchar_t __stdcall DLL *candle_dev_get_path(candle_handle hdev);
-bool __stdcall DLL candle_dev_open(candle_handle hdev);
-bool __stdcall DLL candle_dev_get_timestamp_us(candle_handle hdev, uint32_t *timestamp_us);
-bool __stdcall DLL candle_dev_close(candle_handle hdev);
-bool __stdcall DLL candle_dev_free(candle_handle hdev);
+DLL bool __stdcall candle_dev_get(candle_list_handle list, uint8_t dev_num, candle_handle *hdev);
+DLL bool __stdcall candle_dev_get_state(candle_handle hdev, candle_devstate_t *state);
+DLL wchar_t * __stdcall candle_dev_get_path(candle_handle hdev);
+DLL bool __stdcall candle_dev_open(candle_handle hdev);
+DLL bool __stdcall candle_dev_get_timestamp_us(candle_handle hdev, uint32_t *timestamp_us);
+DLL bool __stdcall candle_dev_close(candle_handle hdev);
+DLL bool __stdcall candle_dev_free(candle_handle hdev);
 
-bool __stdcall DLL candle_channel_count(candle_handle hdev, uint8_t *num_channels);
-bool __stdcall DLL candle_channel_get_capabilities(candle_handle hdev, uint8_t ch, candle_capability_t *cap);
-bool __stdcall DLL candle_channel_set_timing(candle_handle hdev, uint8_t ch, candle_bittiming_t *data);
-bool __stdcall DLL candle_channel_set_bitrate(candle_handle hdev, uint8_t ch, uint32_t bitrate);
-bool __stdcall DLL candle_channel_start(candle_handle hdev, uint8_t ch, uint32_t flags);
-bool __stdcall DLL candle_channel_stop(candle_handle hdev, uint8_t ch);
+DLL bool __stdcall candle_channel_count(candle_handle hdev, uint8_t *num_channels);
+DLL bool __stdcall candle_channel_get_capabilities(candle_handle hdev, uint8_t ch, candle_capability_t *cap);
+DLL bool __stdcall candle_channel_set_timing(candle_handle hdev, uint8_t ch, candle_bittiming_t *data);
+DLL bool __stdcall candle_channel_set_bitrate(candle_handle hdev, uint8_t ch, uint32_t bitrate);
+DLL bool __stdcall candle_channel_start(candle_handle hdev, uint8_t ch, candle_device_mode_flags_t device_mode_flags);
+DLL bool __stdcall candle_channel_stop(candle_handle hdev, uint8_t ch);
 
-bool __stdcall DLL candle_frame_send(candle_handle hdev, uint8_t ch, candle_frame_t *frame);
-bool __stdcall DLL candle_frame_read(candle_handle hdev, candle_frame_t *frame, uint32_t timeout_ms);
+DLL bool __stdcall candle_frame_send(candle_handle hdev, uint8_t ch, candle_frame_t *frame,bool wait_send,uint32_t timeout_ms);
+DLL bool __stdcall candle_frame_read(candle_handle hdev, candle_frame_t *frame, uint32_t timeout_ms);
 
-candle_frametype_t __stdcall DLL candle_frame_type(candle_frame_t *frame);
-uint32_t __stdcall DLL candle_frame_id(candle_frame_t *frame);
-bool __stdcall DLL candle_frame_is_extended_id(candle_frame_t *frame);
-bool __stdcall DLL candle_frame_is_rtr(candle_frame_t *frame);
-uint8_t __stdcall DLL candle_frame_dlc(candle_frame_t *frame);
-uint8_t __stdcall DLL *candle_frame_data(candle_frame_t *frame);
-uint32_t __stdcall DLL candle_frame_timestamp_us(candle_frame_t *frame);
+DLL candle_frametype_t __stdcall candle_frame_type(candle_frame_t *frame);
+DLL uint32_t  __stdcall candle_frame_id(candle_frame_t *frame);
+DLL bool __stdcall candle_frame_is_extended_id(candle_frame_t *frame);
+DLL bool __stdcall candle_frame_is_rtr(candle_frame_t *frame);
+DLL uint8_t __stdcall candle_frame_dlc(candle_frame_t *frame);
+DLL uint8_t * __stdcall candle_frame_data(candle_frame_t *frame);
+DLL uint32_t __stdcall candle_frame_timestamp_us(candle_frame_t *frame);
 
-candle_err_t __stdcall DLL candle_dev_last_error(candle_handle hdev);
+DLL candle_err_t __stdcall candle_dev_last_error(candle_handle hdev);
+DLL const char * __stdcall candle_error_text(candle_err_t errnum);
+
+// This is a convenience function to initialize a single device and start a channel on it
+DLL candle_err_t __stdcall candle_init_single_device(uint8_t device_num, uint8_t device_channel, uint32_t bitrate, candle_device_mode_flags_t device_mode_flags, candle_list_handle *plist, candle_handle *phdev);
 
 #ifdef __cplusplus
 }

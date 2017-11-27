@@ -63,8 +63,9 @@ typedef struct {
 
 typedef struct {
     OVERLAPPED ovl;
-    uint8_t buf[64];
-} canlde_rx_urb;
+    uint8_t buf[64];  // Set this to max packet size for full speed usb.  We may use less
+	uint32_t send_size;
+} candle_tx_rx_urb;
 
 typedef struct {
     wchar_t path[256];
@@ -74,13 +75,24 @@ typedef struct {
     HANDLE deviceHandle;
     WINUSB_INTERFACE_HANDLE winUSBHandle;
     UCHAR interfaceNumber;
-    UCHAR bulkInPipe;
-    UCHAR bulkOutPipe;
+
+	UCHAR bulkInPipe;
+	WINUSB_PIPE_INFORMATION bulkInPipeInfo;
+
+	UCHAR bulkOutPipe;
+	WINUSB_PIPE_INFORMATION bulkOutPipeInfo;
 
     candle_device_config_t dconf;
     candle_capability_t bt_const;
-    canlde_rx_urb rxurbs[CANDLE_URB_COUNT];
-    HANDLE rxevents[CANDLE_URB_COUNT];
+
+	candle_tx_rx_urb txurbs[CANDLE_URB_COUNT];
+	HANDLE txevents[CANDLE_URB_COUNT];
+	uint32_t txurbs_in_use;
+
+	candle_tx_rx_urb rxurbs[CANDLE_URB_COUNT];
+	HANDLE rxevents[CANDLE_URB_COUNT];
+
+	candle_device_mode_flags_t device_mode_flags;
 } candle_device_t;
 
 typedef struct {

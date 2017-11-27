@@ -1,0 +1,37 @@
+Usage: candle_test <options>\nOptions:
+    -a argfile        Read arguments from argfile. # is a comment character
+    -b bitrate        
+    -c device_channel 
+    -f                pad usb packets to full packet size for better speed
+                      (default off, firmware support on candle required
+    -i canbus_id      only print frames from from these ids, multiples ok
+    -n device_number  
+    -p print_period   
+    -r send_rate      (frames per second)
+    -s canbus_id(hex) <byte(hex) byte ...> add this can frame to send list
+    -t                turn on timestamp mode (default off)\n");
+
+This test program was written to evaluate the performance of the
+candle dll under Windows, but it may be useful in its own right. Examples:
+
+candle_test -b 500000 -f -t
+
+This will print out all packets on the canbus with the bit rate set to
+500k bits per second.  Timestamp mode is turned on, and the program
+will try and turn on the mode in the firmware that pads packets to 32
+bytes for better performance.  If this mode isn't supported in the
+firmware you should get an error.  Packets are printed out in columns:
+
+TX rate RX rate Timestamp ID DLC Byte Byte Byte ...
+
+candle_test -s 303 01 02 03 04 05 -i 240
+
+This will get ready to send a canbus packet to an id of 0x303 with 5
+data bytes of 0x01 0x02 0x03 0x04 0x05.  Each time you hit the "s" key
+on the keyboard the packet will be sent.  Only canbus packets received
+with an ID 0f 0x240 will be printed out.
+
+candle_test -a send.txt -f -i -r 1000 -p 1
+
+This will read command options containing a list of packets from the file send.txt (containing a bunch of -s xx xx xx xx lines, for example).  It will send these packets one after another at a rate of 1000 packets per second.  It will print out the last packet received once per second, letting you know the actual transmit and receive rates.
+

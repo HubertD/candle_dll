@@ -1,0 +1,92 @@
+I did a lot of experimentation trying to get this dll to talk to the
+candlelight firmware with good performance. I have a cantact board,
+and the best receive performance I could get with the stock serial
+port emulator firmware under windows was a few hundred packets per
+second.
+
+The first thing I did was to make everything compile with Visual
+Studio Community 2013 (the sort of free version), as this is the
+development environment I need for my application.  It looks like the
+original development enviromnent was maybe GNU C under mingw.  Visual
+Studio seems to expect function declarations that look like this:
+
+__declspec(dllexport) <type> __stdcall function(){}
+
+I changed the order in the header and C files so visual studio doesn't
+complain.  Hopefully this order is OK under the original development
+environment, but I don't know how to set this up and so can't check it.
+If it doesn't work under GNU C, I could create a macro that expands
+differently under each compiler.
+
+I then wrote a command line program to check canbus transmit and
+receive performance under Windows.  For my application, I need to be
+able to transmit canbus packets at 500 hz, and receive replies from
+multiple boards at around 1200 hz.  Using the standard candelight_fw
+and the stock dll, receive performance was limited to 1000 packets per
+second, one per full speed USB frame on my development machine running
+Windws 10.
+
+Interestingly, on a macbook pro laptop that also ran windows 10 this
+limitation didn't apply, so it may be a function of the usb host
+controller software.  This limitation also wasn't present on the same
+machine running Ubuntu 16.04.
+
+I set up a linux development environment for the cantact firmware on a
+virtual machine under VirtualBox, and checked out the master branch of
+candlelight_fw.  After much experimentation, I discovered that if the
+cantact board transmitted full size packets (padded to the max
+transfer size set up in the cantact firmware) you weren't limited to
+one usb transfer per usb frame, at least if the block transfer mode was set
+to raw_io.
+
+This makes a certain amount of sense, since if you were trying to do a
+large block transfer of data from your USB device, why wouldn't you
+send packets of the maximum size until you got to the last packet,
+which could be shorter.
+
+In any case, after hacking the candlelight firmware to just send 32
+byte dummy USB packets to the Windows host, I was able to receive
+nearly 6000 packets per second.
+
+I added a new candle feature bit and mode bits:
+CANDLE_MODE_PAD_PKTS_TO_MAX_PKT_SIZE = 0x80 and
+CANDLE_FEATURE_PAD_PKTS_TO_MAX_PKT_SIZE = 0x80
+
+The modified firmware reports this feature bit set, and if requested
+in the candle mode flags the modified firmware pads each candle frame
+to 32 bytes before it transmits it to the host.
+
+I then ran into more trouble when I started trying to send packets on
+the canbus.  The send function in the original dll would only send
+1000 packets per second, and would hang until each packet was
+transmitted.  I tried packing the output packets to 32 bytes, but this
+didn't help.
+
+I switched to overlapped IO for the WritePipe function.  This got rid
+of the hang, which allowed you to send a packet and start listening
+for replies immediately.  Transmit packets were still limited to
+1k/sec however.  It didn't help to pad the send packets to 32
+bytes, and this sometimes caused the firmware to crash, even after I
+modified the firmware to expect the larger data size.  I think this
+may be related to the fact that setting raw_io on a WinUSB output pipe
+has no effect.
+
+I think you might still be able send multiple packets per millisecond
+by packing them into a single WinUsb_WritePipe call, but I didn't test
+this because I didn't need it for my application.
+
+The modified firmware sends 20 or 24 byte packets (depending on
+whether CANDLE_MODE_HW_TIMESTAMP is set) by default.  It seems to work
+OK with the standard linux firmware.  If
+CANDL_MODE_PAD_PKTS_TO_MAX_PKT_SIZE is set I was able to receive more than 2k
+packets per second while transmitting up to 1k per second on Windows.
+I checked this on two Windows 10 machines, and one Windows 7 machine.
+
+If you use the standard candlelight_fw you may be limited to 1k
+packets per second receiving, depending on you windows USB driver.
+
+
+
+
+
+

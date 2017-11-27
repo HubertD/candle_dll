@@ -1,0 +1,28 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio 2013
+VisualStudioVersion = 12.0.31101.0
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "candle_dll", "candle_dll.vcxproj", "{AAA1131F-0D30-470B-B620-074081D55A33}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "candle_test", "..\candle_test\candle_test.vcxproj", "{1575813C-E2FD-4BC0-BA0D-739414F702F9}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Win32 = Debug|Win32
+		Release|Win32 = Release|Win32
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{AAA1131F-0D30-470B-B620-074081D55A33}.Debug|Win32.ActiveCfg = Debug|Win32
+		{AAA1131F-0D30-470B-B620-074081D55A33}.Debug|Win32.Build.0 = Debug|Win32
+		{AAA1131F-0D30-470B-B620-074081D55A33}.Release|Win32.ActiveCfg = Release|Win32
+		{AAA1131F-0D30-470B-B620-074081D55A33}.Release|Win32.Build.0 = Release|Win32
+		{1575813C-E2FD-4BC0-BA0D-739414F702F9}.Debug|Win32.ActiveCfg = Debug|Win32
+		{1575813C-E2FD-4BC0-BA0D-739414F702F9}.Debug|Win32.Build.0 = Debug|Win32
+		{1575813C-E2FD-4BC0-BA0D-739414F702F9}.Release|Win32.ActiveCfg = Release|Win32
+		{1575813C-E2FD-4BC0-BA0D-739414F702F9}.Release|Win32.Build.0 = Release|Win32
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal

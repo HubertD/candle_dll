@@ -1,0 +1,33 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="../candle.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="../candle_ctrl_req.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="../candle.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="../candle_defs.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="../candle_ctrl_req.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="../ch_9.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="Header Files">
+      <UniqueIdentifier>{93fb5c47-a832-4cf2-8397-d1afed82a4ff}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{013f841b-61b1-4cd3-9cb1-6d204249baf2}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>
