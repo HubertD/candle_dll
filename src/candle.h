@@ -3,17 +3,17 @@
   Copyright (c) 2016 Hubert Denkmair <hubert@denkmair.de>
 
   This file is part of the candle windows API.
-  
+
   This library is free software: you can redistribute it and/or
   modify it under the terms of the GNU Lesser General Public
   License as published by the Free Software Foundation, either
   version 3 of the License, or (at your option) any later version.
- 
+
   This library is distributed in the hope that it will be useful,
   but WITHOUT ANY WARRANTY; without even the implied warranty of
   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
   Lesser General Public License for more details.
- 
+
   You should have received a copy of the GNU Lesser General Public
   License along with this library.  If not, see <http://www.gnu.org/licenses/>.
 
@@ -45,10 +45,11 @@ typedef enum {
 
 typedef enum {
     CANDLE_MODE_NORMAL        = 0x00,
-    CANDLE_MODE_LISTEN_ONLY   = 0x01,
-    CANDLE_MODE_LOOP_BACK     = 0x02,
-    CANDLE_MODE_TRIPLE_SAMPLE = 0x04,
-    CANDLE_MODE_ONE_SHOT      = 0x08
+    CANDLE_MODE_LISTEN_ONLY   = 1 << 0,
+    CANDLE_MODE_LOOP_BACK     = 1 << 1,
+    CANDLE_MODE_TRIPLE_SAMPLE = 1 << 2,
+    CANDLE_MODE_ONE_SHOT      = 1 << 3,
+    CANDLE_MODE_HW_TIMESTAMP  = 1 << 4
 } candle_mode_t;
 
 typedef enum {

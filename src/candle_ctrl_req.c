@@ -3,17 +3,17 @@
   Copyright (c) 2016 Hubert Denkmair <hubert@denkmair.de>
 
   This file is part of the candle windows API.
-  
+
   This library is free software: you can redistribute it and/or
   modify it under the terms of the GNU Lesser General Public
   License as published by the Free Software Foundation, either
   version 3 of the License, or (at your option) any later version.
- 
+
   This library is distributed in the hope that it will be useful,
   but WITHOUT ANY WARRANTY; without even the implied warranty of
   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
   Lesser General Public License for more details.
- 
+
   You should have received a copy of the GNU Lesser General Public
   License along with this library.  If not, see <http://www.gnu.org/licenses/>.
 
@@ -29,8 +29,15 @@ enum {
     CANDLE_BREQ_BERR,
     CANDLE_BREQ_BT_CONST,
     CANDLE_BREQ_DEVICE_CONFIG,
-    CANDLE_TIMESTAMP_GET = 0x40,
-    CANDLE_TIMESTAMP_ENABLE = 0x41,
+    CANDLE_BREQ_TIMESTAMP,
+    CANDLE_BREQ_IDENTIFY,
+    CANDLE_BREQ_GET_USER_ID,    //not implemented
+    CANDLE_BREQ_SET_USER_ID,    //not implemented
+    CANDLE_BREQ_DATA_BITTIMING,
+    CANDLE_BREQ_BT_CONST_EXT,
+    CANDLE_BREQ_SET_TERMINATION,
+    CANDLE_BREQ_GET_TERMINATION,
+    CANDLE_BREQ_GET_STATE
 };
 
 
@@ -65,24 +72,6 @@ bool candle_ctrl_set_host_format(candle_device_t *dev)
     );
 
     dev->last_error = rc ? CANDLE_ERR_OK : CANDLE_ERR_SET_HOST_FORMAT;
-    return rc;
-}
-
-bool candle_ctrl_set_timestamp_mode(candle_device_t *dev, bool enable_timestamps)
-{
-    uint32_t ts_config = enable_timestamps ? 1 : 0;
-
-    bool rc = usb_control_msg(
-        dev->winUSBHandle,
-        CANDLE_TIMESTAMP_ENABLE,
-        USB_DIR_OUT|USB_TYPE_VENDOR|USB_RECIP_INTERFACE,
-        1,
-        ts_config,
-        NULL,
-        0
-    );
-
-    dev->last_error = rc ? CANDLE_ERR_OK : CANDLE_ERR_SET_TIMESTAMP_MODE;
     return rc;
 }
 
@@ -127,7 +116,7 @@ bool candle_ctrl_get_timestamp(candle_device_t *dev, uint32_t *current_timestamp
 {
     bool rc = usb_control_msg(
         dev->winUSBHandle,
-        CANDLE_TIMESTAMP_GET,
+        CANDLE_BREQ_TIMESTAMP,
         USB_DIR_IN|USB_TYPE_VENDOR|USB_RECIP_INTERFACE,
         1,
         dev->interfaceNumber,
