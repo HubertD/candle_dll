@@ -21,6 +21,7 @@
 
 #include "candle.h"
 #include <stdlib.h>
+#include <math.h>
 
 #include "candle_defs.h"
 #include "candle_ctrl_req.h"
@@ -74,7 +75,7 @@ static bool candle_read_di(HDEVINFO hdi, SP_DEVICE_INTERFACE_DATA interfaceData,
     return true;
 }
 
-bool __stdcall candle_list_scan(candle_list_handle *list)
+DLL bool __stdcall candle_list_scan(candle_list_handle *list)
 {
     if (list==NULL) {
         return false;
@@ -396,78 +397,70 @@ DLL bool __stdcall candle_channel_set_timing(candle_handle hdev, uint8_t ch, can
     return candle_ctrl_set_bittiming(dev, ch, data);
 }
 
+/**
+ * @brief Sets the bitrate for a specific channel in the CAN device.
+ * Algorithm taken from the site http://www.bittiming.can-wiki.info/.
+ *
+ * @param hdev     Handle to the CAN device.
+ * @param ch       Channel number for which the bitrate is being set.
+ * @param bitrate  Desired bitrate value in bits per second (bps).
+ *
+ * @return         Returns `true` if the bitrate was successfully set, `false` otherwise.
+ *                 Actual implementation should handle error conditions and return appropriate values.
+ */
 DLL bool __stdcall candle_channel_set_bitrate(candle_handle hdev, uint8_t ch, uint32_t bitrate)
 {
     // TODO ensure device is open, check channel count..
+    bool ret = false;
     candle_device_t *dev = (candle_device_t*)hdev;
+    candle_bittiming_t t =
+    {
+        .prop_seg = 1,
+        .sjw = 1
+    };
+    static const float SAMPLE_POINT = 0.875; /** Is prefered value used by CANopen and DeviceNet.
+                                                0.75 sample point is defined by ISO-11898 */
+    float best_diff_sp = SAMPLE_POINT;
 
-    if (dev->bt_const.fclk_can != 48000000) {
-        /* this function only works for the candleLight base clock of 48MHz */
-        dev->last_error = CANDLE_ERR_BITRATE_FCLK;
-        return false;
+    for(size_t brp = 0; brp < 1024; ++brp)
+    {
+        static const float ACCURACY = 0.000000001f;
+        const float t_scl = (float)brp / (float)dev->bt_const.fclk_can;
+        const float bit_time = 1/(float)bitrate;
+        const float ratio = bit_time / t_scl;
+        const size_t segments = round(ratio);
+
+        if(fabs(segments - ratio) > ACCURACY) continue;
+
+        candle_bittiming_t t_temp;
+        memcpy(&t_temp, &t, sizeof(candle_bittiming_t));
+
+        t_temp.phase_seg1 = round(segments * SAMPLE_POINT) - (t_temp.prop_seg + t_temp.sjw);
+        t_temp.phase_seg2 = segments - (t_temp.sjw + t_temp.prop_seg + t_temp.phase_seg1);
+
+        if((t_temp.phase_seg1 > 16) || (t_temp.phase_seg2 > 8)) continue; /** STM register restrictions */
+        if(0 == t_temp.phase_seg1) break;
+
+        float real_sp = (float)(t_temp.sjw + t_temp.prop_seg + t_temp.phase_seg1) / (float)segments;
+
+        float temp_diff_sp = fabs(real_sp - SAMPLE_POINT);
+        if(temp_diff_sp < best_diff_sp)
+        {/* search for the best */
+            ret = true;
+            best_diff_sp = temp_diff_sp;
+            memcpy(&t, &t_temp, sizeof(candle_bittiming_t));
+            t.brp = brp;
+        }
     }
 
-    candle_bittiming_t t;
-    t.prop_seg = 1;
-    t.sjw = 1;
-    t.phase_seg1 = 13 - t.prop_seg;
-    t.phase_seg2 = 2;
-
-    switch (bitrate) {
-        case 10000:
-            t.brp = 300;
-            break;
-
-        case 20000:
-            t.brp = 150;
-            break;
-
-        case 50000:
-            t.brp = 60;
-            break;
-
-        case 83333:
-            t.brp = 36;
-            break;
-
-        case 100000:
-            t.brp = 30;
-            break;
-
-        case 125000:
-            t.brp = 24;
-            break;
-
-        case 250000:
-            t.brp = 12;
-            break;
-
-        case 500000:
-            t.brp = 6;
-            break;
-
-        case 800000:
-            t.brp = 4;
-            t.phase_seg1 = 12 - t.prop_seg;
-            t.phase_seg2 = 2;
-            break;
-
-        case 1000000:
-            t.brp = 3;
-            break;
-
-        default:
-            dev->last_error = CANDLE_ERR_BITRATE_UNSUPPORTED;
-            return false;
-    }
-
-    return candle_ctrl_set_bittiming(dev, ch, &t);
+    return ret ? candle_ctrl_set_bittiming(dev, ch, &t) : ret;
 }
 
 DLL bool __stdcall candle_channel_start(candle_handle hdev, uint8_t ch, uint32_t flags)
 {
     // TODO ensure device is open, check channel count..
     candle_device_t *dev = (candle_device_t*)hdev;
+    flags |= CANDLE_MODE_HW_TIMESTAMP;
     return candle_ctrl_set_device_mode(dev, ch, CANDLE_DEVMODE_START, flags);
 }
 
@@ -527,10 +520,15 @@ DLL bool __stdcall candle_frame_read(candle_handle hdev, candle_frame_t *frame, 
         return false;
     }
 
-    if (bytes_transfered != sizeof(*frame)) {
+    if (bytes_transfered < (sizeof(*frame) - sizeof(frame->timestamp_us))) {
         candle_prepare_read(dev, urb_num);
         dev->last_error = CANDLE_ERR_READ_SIZE;
+        printf("readsize %d", bytes_transfered);
         return false;
+    }
+
+    if (bytes_transfered < sizeof(*frame)) {
+        frame->timestamp_us = 0;
     }
 
     memcpy(frame, dev->rxurbs[urb_num].buf, sizeof(*frame));
